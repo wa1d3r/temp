@@ -1,0 +1,27 @@
+#pragma once
+#include "../game_interfaces.h"
+#include "PacketType.h"
+#include "../core/move.h"
+#include <SFML/Network.hpp>
+#include <iostream>
+
+class NetworkClient : public INetworkInterface
+{
+    sf::TcpSocket socket;
+    bool connected = false;
+    bool peerResignedFlag = false;
+
+public:
+    NetworkClient();
+    virtual ~NetworkClient();
+
+    bool connect(const std::string& ip, unsigned short port);
+
+    bool waitForStart(Color& assignedColor);
+
+    void sendMove(const Move& move) override;
+    Move receiveMove() override;
+    bool isConnected() override;
+    void sendGameOver() override;
+    bool isPeerResigned() override;
+};
