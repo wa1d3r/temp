@@ -416,4 +416,10 @@ public:
     {
         isPromotionActive = false;
     }
+
+    void showMessage(const std::string& message) override
+    {
+        currentMessage = message;
+        isMessageVisible = true;
+    }
 };
