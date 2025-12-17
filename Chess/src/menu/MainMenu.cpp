@@ -126,3 +126,61 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     setupButtons.push_back(createBtn({ 0.35f, 0.8f }, { 0.3f, 0.1f }, "START GAME", [this]() {
         if (onStartGame) onStartGame(currentConfig); }, sf::Color(100, 255, 100)));
 }
+
+void MainMenu::handleEvent(const std::optional<sf::Event>& event)
+{
+    if (currentScreen == MenuScreen::Main)
+    {
+        for (auto& btn : mainButtons)
+            btn->handleEvent(event, window);
+    }
+    else if (currentScreen == MenuScreen::GameSetup)
+    {
+        for (auto& btn : setupButtons)
+            btn->handleEvent(event, window);
+        for (auto& btn : backButton)
+            btn->handleEvent(event, window);
+    }
+    else if (currentScreen == MenuScreen::About)
+    {
+        for (auto& btn : aboutButtons)
+            btn->handleEvent(event, window);
+        for (auto& btn : backButton)
+            btn->handleEvent(event, window);
+    }
+    else if (currentScreen == MenuScreen::Settings)
+    {
+        for (auto& btn : backButton)
+            btn->handleEvent(event, window);
+    }
+}
+
+void MainMenu::draw()
+{
+    window.draw(*backgroundSprite);
+
+    if (currentScreen == MenuScreen::Main)
+    {
+        for (auto& btn : mainButtons)
+            btn->draw(window);
+    }
+    else if (currentScreen == MenuScreen::GameSetup)
+    {
+        for (auto& btn : setupButtons)
+            btn->draw(window);
+        for (auto& btn : backButton)
+            btn->draw(window);
+    }
+    else if (currentScreen == MenuScreen::About)
+    {
+        for (auto& btn : aboutButtons)
+            btn->draw(window);
+        for (auto& btn : backButton)
+            btn->draw(window);
+    }
+    else if (currentScreen == MenuScreen::Settings)
+    {
+        for (auto& btn : backButton)
+            btn->draw(window);
+    }
+}
