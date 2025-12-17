@@ -66,4 +66,28 @@ public:
     {
         onSquareClickCallback = callback;
     }
+
+    void setOnResign(std::function<void()> callback) override
+    {
+        onResignCallback = callback;
+    }
+
+    void handleEvent(const std::optional<sf::Event>& event)
+    {
+        if (isPromotionActive)
+        {
+            for (auto& btn : promotionButtons)
+            {
+                btn->handleEvent(event, window);
+            }
+            return;
+        }
+
+        resignButton->handleEvent(event, window);
+
+        for (auto& btn : boardButtons)
+        {
+            btn->handleEvent(event, window);
+        }
+    }
 };
