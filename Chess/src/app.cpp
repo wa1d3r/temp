@@ -62,7 +62,53 @@ int main()
 
         if (config.opponentType == OpponentType::Network)
         {
-            // network = std::make_unique<NetworkClient>(...);
+            auto netClient = std::make_unique<NetworkClient>();
+
+            // 1. Ввод IP
+            std::string ip;
+            std::cout << "Enter Server IP (default 127.0.0.1): ";
+
+            if (std::cin.peek() == '\n')
+                std::cin.ignore();
+
+            std::getline(std::cin, ip);
+
+            if (ip.empty())
+                ip = "127.0.0.1";
+            else
+            {
+                ip.erase(std::remove(ip.begin(), ip.end(), ' '), ip.end());
+                ip.erase(std::remove(ip.begin(), ip.end(), '\r'), ip.end());
+            }
+
+            std::cout << "Connecting to [" << ip << "]..." << std::endl;
+
+            // 2. Подключение
+            if (netClient->connect(ip, 53000))
+            {
+                std::cout << "Connected. Waiting for second player..." << std::endl;
+
+                Color myColor = Color::White;
+
+                if (netClient->waitForStart(myColor))
+                {
+                    config.playerColor = myColor;
+                    network = std::move(netClient);
+                    graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
+                    graphics->setOnClickCallback([&](Position pos) {
+                        });
+                }
+                else
+                {
+                    std::cout << "Connection failed or server disconnected." << std::endl;
+                    return; 
+                }
+            }
+            else
+            {
+                std::cout << "Failed to connect." << std::endl;
+                return; 
+            }
         }
         else if (config.opponentType == OpponentType::AI)
         {
