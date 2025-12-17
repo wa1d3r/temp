@@ -34,4 +34,26 @@ public:
         }
         return nullptr;
     }
+
+    bool loadFont(const std::string& name, const std::string& path)
+    {
+        sf::Font font;
+        if (font.openFromFile(path))
+        {
+            fonts[name] = font;
+            return true;
+        }
+        std::cerr << "Failed to load font: " << path << std::endl;
+        return false;
+    }
+
+    const sf::Font* getFont(const std::string& name) const
+    {
+        auto it = fonts.find(name);
+        if (it != fonts.end())
+        {
+            return &it->second;
+        }
+        return nullptr;
+    }
 };
