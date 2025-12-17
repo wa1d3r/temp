@@ -198,4 +198,88 @@ public:
             btn->handleEvent(event, window);
         }
     }
+
+    void drawBoard(const Board& board, Color currentPlayer) override
+    {
+        auto& grid = board.getGrid();
+        window.draw(*backgroundSprite);
+
+        for (int y = 0; y < 8; y++)
+        {
+            for (int x = 0; x < 8; x++)
+            {
+                int index = y * 8 + x;
+                Button* btn = boardButtons[index].get();
+                auto& buffer = *cellBuffers[index];
+                buffer.clear();
+
+                std::string bgKey = ((x + y + 1) % 2 == 0) ? "cell_white" : "cell_black";
+                sf::Sprite bgSprite(*resourceManager.getTexture(bgKey));
+
+                float scaleX = static_cast<float>(buffer.getSize().x) / bgSprite.getTexture().getSize().x;
+                float scaleY = static_cast<float>(buffer.getSize().y) / bgSprite.getTexture().getSize().y;
+                bgSprite.setScale(sf::Vector2f(scaleX, scaleY));
+                buffer.draw(bgSprite);
+
+                if (highlighted[index] != Highlight::NO_HIGHLIGHT)
+                {
+                    std::string hlKey = (Highlight::CURRENT_POS == highlighted[index]) ? "current_pos"
+                        : (Highlight::LAST_POS == highlighted[index])                  ? "last_pos"
+                        : (Highlight::CHECK_POS == highlighted[index])                 ? "check"
+                        : (Highlight::FRAME == highlighted[index])                     ? "frame"
+                        : (Highlight::POINT == highlighted[index] && grid[y][x])       ? "frame"
+                                                                                       : "point";
+                    sf::Sprite hlSprite(*resourceManager.getTexture(hlKey));
+                    float scaleX = static_cast<float>(buffer.getSize().x) / hlSprite.getTexture().getSize().x;
+                    float scaleY = static_cast<float>(buffer.getSize().y) / hlSprite.getTexture().getSize().y;
+                    hlSprite.setScale(sf::Vector2f(scaleX, scaleY));
+                    buffer.draw(hlSprite);
+                }
+
+                if (grid[y][x])
+                {
+                    const Piece& p = *grid[y][x];
+                    std::string key = p.getType() + "_" + (p.getColor() == Color::White ? "white" : "black");
+                    auto pieceTexture = resourceManager.getTexture(key);
+
+                    sf::Sprite pieceSprite(*pieceTexture);
+                    float scaleX = static_cast<float>(buffer.getSize().x) / pieceTexture->getSize().x;
+                    float scaleY = static_cast<float>(buffer.getSize().y) / pieceTexture->getSize().y;
+                    pieceSprite.setScale(sf::Vector2f(scaleX, scaleY));
+                    buffer.draw(pieceSprite);
+                }
+
+                buffer.display();
+
+                btn->setTexture(&buffer.getTexture());
+                btn->draw(window);
+            }
+        }
+
+        float whiteTime = board.getWhiteTime();
+        float blackTime = board.getBlackTime();
+
+        bool isTopActive = currentPlayer != viewColor;
+        drawClock(blackTime, topClockArea, resourceManager.getTexture(isTopActive ? "active_clock" : "disactive_clock"));
+        drawClock(whiteTime, bottomClockArea, resourceManager.getTexture(isTopActive ? "disactive_clock" : "active_clock"));
+
+        if (isPromotionActive)
+        {
+            window.draw(promotionBgShape);
+
+            for (auto& btn : promotionButtons)
+            {
+                btn->draw(window);
+            }
+        }
+
+        drawHistoryList(board.getHistory());
+
+        resignButton->draw(window);
+
+        if (isMessageVisible)
+        {
+            drawMessageOverlay();
+        }
+    }
 };
