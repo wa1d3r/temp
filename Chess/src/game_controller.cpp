@@ -120,6 +120,71 @@ void GameController::update()
     }
 }
 
+void GameController::aiThreadFunc()
+{
+    if (stockfish)
+    {
+        std::string fen = board->getFen();
+        std::cout << fen << std::endl;
+        std::string move = stockfish->getBestMove(fen);
+        std::cout << move << std::endl
+                  << std::endl;
+        aiBestMoveStr = move;
+    }
+    // Сигнал о завершении
+    aiThinking = false;
+}
+
+Move GameController::stringToMove(std::string moveStr)
+{
+    if (moveStr.length() < 4)
+        return Move();
+
+    int fromX = moveStr[0] - 'a';
+    int fromY = moveStr[1] - '1';
+    int toX = moveStr[2] - 'a';
+    int toY = moveStr[3] - '1';
+
+    Position from(fromX, fromY);
+    Position to(toX, toY);
+
+    if (!from.isValid() || !to.isValid())
+        return Move();
+
+    std::vector<Move> moves = board->getSelectableMoves(from);
+
+    std::string promoType = "";
+    if (moveStr.length() == 5)
+    {
+        char p = moveStr[4];
+        if (p == 'q')
+            promoType = "queen";
+        else if (p == 'r')
+            promoType = "rook";
+        else if (p == 'b')
+            promoType = "bishop";
+        else if (p == 'n')
+            promoType = "knight";
+    }
+
+    for (const auto& m : moves)
+    {
+        if (m.getTo() == to)
+        {
+            if (m.isPromotion())
+            {
+                if (m.getPromotionPiece() == promoType)
+                    return m;
+            }
+            else
+            {
+                return m;
+            }
+        }
+    }
+    return Move();
+}
+
 void GameController::onClick(int x, int y)
 {
     // Блокируем клики, пока думает ИИ
