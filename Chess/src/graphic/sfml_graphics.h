@@ -199,6 +199,45 @@ public:
         }
     }
 
+    void drawHistoryList(const std::vector<Move>& history)
+    {
+        // Фон окна истории
+        sf::RectangleShape bg(historyArea.size);
+        bg.setPosition(historyArea.position);
+        bg.setFillColor(sf::Color(0, 0, 0, 150)); // Полупрозрачный черный
+        bg.setOutlineColor(sf::Color::White);
+        bg.setOutlineThickness(2.0f);
+        window.draw(bg);
+
+        const sf::Font* font = resourceManager.getFont("main_font");
+        unsigned int charSize = static_cast<unsigned int>(historyArea.size.x * 0.1f);
+        if (charSize < 12)
+            charSize = 12;
+
+        float lineSpacing = charSize * 1.2f;
+        int maxLines = static_cast<int>(historyArea.size.y / lineSpacing);
+
+        // Рисуем последние N ходов, которые влезают
+        int startIdx = 0;
+        if (history.size() > maxLines)
+        {
+            startIdx = history.size() - maxLines;
+        }
+
+        for (size_t i = startIdx; i < history.size(); ++i)
+        {
+            const Move& m = history[i];
+            std::string moveStr = std::to_string(i + 1) + ". " + posToString(m.getFrom()) + "-" + posToString(m.getTo());
+
+            sf::Text text(*font, moveStr, charSize);
+            text.setFillColor(sf::Color::White);
+            text.setPosition(sf::Vector2f(
+                historyArea.position.x + 10.0f,
+                historyArea.position.y + (i - startIdx) * lineSpacing + 5.0f));
+            window.draw(text);
+        }
+    }
+
     void drawClock(float time, sf::FloatRect rectArea, const sf::Texture* bgTex)
     {
         int totalSeconds = static_cast<int>(std::floor(time));
