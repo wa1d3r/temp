@@ -108,3 +108,17 @@ void Button::setTexture(const sf::Texture* texture)
         shape.setFillColor(is_hovered ? hover_color : default_color);
     }
 }
+
+void Button::setFillColor(sf::Color color)
+{
+    default_color = color;
+    if (!use_texture && !is_hovered)
+    {
+        shape.setFillColor(color);
+    }
+}
+
+void Button::setOutlineColor(sf::Color color)
+{
+    shape.setOutlineColor(color);
+}
