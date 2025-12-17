@@ -282,4 +282,69 @@ public:
             drawMessageOverlay();
         }
     }
+
+    void highlightMoves(const std::vector<Move>& moves) override
+    {
+        for (const auto& move : moves)
+        {
+            Position to = move.getTo();
+            setCellTypeHl(to, Highlight::POINT);
+        }
+    }
+
+    void setCellTypeHl(Position pos, Highlight hl) override
+    {
+        int index = pos.getY() * 8 + pos.getX();
+        highlighted[index] = hl;
+    }
+
+    void clearHighlights() override
+    {
+        std::fill(highlighted.begin(), highlighted.end(), Highlight::NO_HIGHLIGHT);
+    }
+
+    void showPromotionSelector(Color color, std::function<void(std::string)> callback, const std::vector<std::string>& promotionTypes) override
+    {
+        isPromotionActive = true;
+        promotionButtons.clear();
+
+        sf::Vector2u winSize = window.getSize();
+        float minSide = min(static_cast<float>(winSize.x), static_cast<float>(winSize.y));
+        float margin = minSide * 0.05f;
+        float boardSide = minSide - 2.0f * margin;
+        float cellSize = (minSide * 0.9f) / 8.0f;
+
+        float startX = margin + 2 * cellSize;
+        float startY = margin + 4 * cellSize;
+
+        std::string suffix = (color == Color::White) ? "_white" : "_black";
+
+        promotionBgShape.setSize(sf::Vector2f(8.0f * cellSize, 8.0f * cellSize));
+        promotionBgShape.setPosition(sf::Vector2f(margin, margin));
+
+        promotionBgShape.setFillColor(sf::Color(50, 50, 50, 200));
+
+        int i = 0;
+        for (const auto& type : promotionTypes)
+        {
+            float btnX = startX + (i++ * cellSize);
+            sf::Vector2f relPos(btnX / winSize.x, startY / winSize.y);
+            sf::Vector2f relSize(cellSize / winSize.x, cellSize / winSize.y);
+
+            auto btn = std::make_unique<Button>(
+                relPos, relSize, winSize, 0,
+                [callback, type]() { callback(type); },
+                "", 0, nullptr,
+                sf::Color(240, 240, 240, 200),
+                sf::Color(200, 200, 255, 255),
+                sf::Color::Black, sf::Color::Black,
+                resourceManager.getTexture(type + suffix));
+            promotionButtons.push_back(std::move(btn));
+        }
+    }
+
+    void hidePromotionSelector() override
+    {
+        isPromotionActive = false;
+    }
 };
