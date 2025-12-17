@@ -52,3 +52,10 @@ Button::Button(sf::Vector2f position, sf::Vector2f size, sf::Vector2u window_siz
         text->setPosition(sf::Vector2f(position.x + size.x / 2.f, position.y + size.y / 2.f));
     }
 }
+
+void Button::draw(sf::RenderWindow& window)
+{
+    window.draw(shape);
+    if (text)
+        window.draw(*text);
+}
