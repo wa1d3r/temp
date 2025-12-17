@@ -12,7 +12,7 @@ class ResourceManager
 public:
     ResourceManager() = default;
 
-    bool loadTexture(std::string name, std::string path)
+    bool loadTexture(const std::string& name, const std::string& path)
     {
         sf::Texture tex;
         if (tex.loadFromFile(path))
@@ -25,7 +25,7 @@ public:
         return false;
     }
 
-    const sf::Texture* getTexture(std::string name) const
+    const sf::Texture* getTexture(const std::string& name) const
     {
         auto it = textures.find(name);
         if (it != textures.end())
