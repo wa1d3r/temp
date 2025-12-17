@@ -91,3 +91,20 @@ void Button::handleEvent(const std::optional<sf::Event>& event, const sf::Render
         }
     }
 }
+
+void Button::setTexture(const sf::Texture* texture)
+{
+    default_texture = texture;
+    if (texture)
+    {
+        use_texture = true;
+        shape.setTexture(texture, true);
+        shape.setFillColor(sf::Color::White);
+    }
+    else
+    {
+        use_texture = false;
+        shape.setTexture(nullptr);
+        shape.setFillColor(is_hovered ? hover_color : default_color);
+    }
+}
