@@ -199,6 +199,36 @@ public:
         }
     }
 
+    void drawClock(float time, sf::FloatRect rectArea, const sf::Texture* bgTex)
+    {
+        int totalSeconds = static_cast<int>(std::floor(time));
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+
+        std::stringstream ss;
+        ss << std::setfill('0') << std::setw(2) << minutes << ":"
+           << std::setfill('0') << std::setw(2) << seconds;
+
+        sf::RectangleShape rect(sf::Vector2f(rectArea.size.x, rectArea.size.y));
+        rect.setPosition(sf::Vector2f(rectArea.position.x, rectArea.position.y));
+
+        rect.setTexture(bgTex);
+
+        const sf::Font* font = resourceManager.getFont("main_font");
+
+        unsigned int charSize = static_cast<unsigned int>(rectArea.size.y * 0.6f);
+        sf::Text text(*font, ss.str(), charSize);
+        text.setFillColor(sf::Color(230, 230, 230, 180));
+
+        sf::FloatRect textBounds = text.getLocalBounds();
+        text.setOrigin(textBounds.getCenter());
+
+        text.setPosition(rect.getPosition() + rect.getSize() / 2.0f);
+
+        window.draw(rect);
+        window.draw(text);
+    }
+
     void drawBoard(const Board& board, Color currentPlayer) override
     {
         auto& grid = board.getGrid();
