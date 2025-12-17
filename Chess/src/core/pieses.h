@@ -44,6 +44,30 @@ protected:
         std::vector<std::pair<int, int>> directions) const;
 };
 
+class PieceFactory
+{
+    std::map<std::string, std::function<std::unique_ptr<Piece>(Color color, Position pos, bool is_moved)>> creators;
+
+public:
+    template<typename T>
+    void registration(const std::string& type)
+    {
+        creators[type] = [](Color color, Position pos, bool is_moved) -> std::unique_ptr<Piece> {
+            return std::make_unique<T>(color, pos, is_moved);
+        };
+    }
+
+    std::unique_ptr<Piece> create(const std::string& type, Color color, Position pos, bool is_moved=false)
+    {
+        auto it = creators.find(type);
+        if (it != creators.end())
+        {
+            return it->second(color, pos, is_moved);
+        }
+        return nullptr;
+    }
+};
+
 class Pawn : public Piece
 {
 public:
