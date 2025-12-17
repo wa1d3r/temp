@@ -21,6 +21,7 @@ public:
             textures[name] = tex;
             return true;
         }
+        std::cerr << "Failed to load texture: " << path << " (" << name << ")" << std::endl;
         return false;
     }
 
@@ -29,7 +30,7 @@ public:
         auto it = textures.find(name);
         if (it != textures.end())
         {
-            return it->second;
+            return &it->second;
         }
         return nullptr;
     }
