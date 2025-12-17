@@ -132,24 +132,20 @@ bool Test::isValidMove(const Piece::board_type& board, Color color, Move move, s
 
 bool Test::isCheckmate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
 {
+    // 1. ћат возможен, только если король сейчас под шахом
+    if (!isInCheck(board, color, lastMove))
+    {
+        return false;
+    }
+
+    // 2. ѕровер€ем все возможные ходы
     std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
 
     for (const Move& move : all_possible_moves)
     {
-        if (!isValidMove(board, color, move, lastMove))
-            continue;
-
-        Piece::board_type board_copy = copyBoard(board);
-
-        Position from = move.getFrom();
-        Position to = move.getTo();
-
-        board_copy[to.getY()][to.getX()] = std::move(board_copy[from.getY()][from.getX()]);
-        board_copy[to.getY()][to.getX()]->move(move);
-
-        if (!isInCheck(board_copy, color, move))
+        if (isValidMove(board, color, move, lastMove))
         {
-            return false;
+            return false; // Ќашли хот€ бы один доступный ход Ч значит, не мат
         }
     }
 
@@ -180,7 +176,7 @@ bool Test::ceilInCheck(const Piece::board_type& board, std::vector<Move> enemy_m
 {
     return enemy_moves.end() != std::find_if(enemy_moves.begin(), enemy_moves.end(), [pos](const Move& move) {
         return move.getTo() == pos;
-    });
+        });
 }
 
 bool Test::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
@@ -197,8 +193,6 @@ bool Test::isInCheck(const Piece::board_type& board, Color color, std::optional<
         if (it != row.end())
             king_pos = it->get()->getPosition();
     }
-    if (!king_pos.isValid())
-        return false;
 
     std::vector<Move> enemy_moves = getAllMoves(board, (color == Color::White) ? Color::Black : Color::White, lastMove);
     return ceilInCheck(board, enemy_moves, king_pos);
@@ -222,24 +216,19 @@ std::vector<Move> Test::getAllMoves(const Piece::board_type& board, Color color,
     return all_moves;
 }
 
-bool Test::isStalemate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
+bool Test::isStalemate(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
 {
+    if (isInCheck(board, color, lastMove))
+    {
+        return false;
+    }
+
+    auto* nonConstThis = const_cast<Test*>(this);
     std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
 
     for (const Move& move : all_possible_moves)
     {
-        if (!isValidMove(board, color, move, lastMove))
-            continue;
-
-        Piece::board_type board_copy = copyBoard(board);
-
-        Position from = move.getFrom();
-        Position to = move.getTo();
-
-        board_copy[to.getY()][to.getX()] = std::move(board_copy[from.getY()][from.getX()]);
-        board_copy[to.getY()][to.getX()]->move(move);
-
-        if (!isInCheck(board_copy, color, lastMove))
+        if (nonConstThis->isValidMove(board, color, move, lastMove))
         {
             return false;
         }
