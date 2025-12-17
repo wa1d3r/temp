@@ -119,3 +119,108 @@ void GameController::update()
         aiThread = std::thread(&GameController::aiThreadFunc, this);
     }
 }
+
+void GameController::onClick(int x, int y)
+{
+    // Блокируем клики, пока думает ИИ
+    if (state == ControllerState::OpponentTurn || state == ControllerState::PromotionWait || afterEnd || aiThinking)
+        return;
+
+    auto sfmlGraphics = std::dynamic_pointer_cast<SFMLGraphics>(graphics);
+    if (!sfmlGraphics)
+        return;
+
+    Position targetPos(x, y);
+
+    if (!targetPos.isValid())
+        return;
+
+    auto& grid = board->getGrid();
+
+    graphics->clearHighlights();
+
+    if (state == ControllerState::None)
+    {
+        auto& piece = grid[targetPos.getY()][targetPos.getX()];
+        if (piece && piece->getColor() == board->getCurrentPlayer())
+        {
+            selectedPos = targetPos;
+            state = ControllerState::PieceSelected;
+            graphics->setSelectedPiece(targetPos);
+            hightLightsMoves = board->getSelectableMoves(targetPos);
+            graphics->highlightMoves(hightLightsMoves);
+        }
+    }
+    else if (state == ControllerState::PieceSelected)
+    {
+        Move move(*selectedPos, targetPos);
+        auto hlMove = std::find(hightLightsMoves.begin(), hightLightsMoves.end(), move);
+
+        if (hlMove != hightLightsMoves.end())
+        {
+            if (hlMove->isPromotion())
+            {
+                state = ControllerState::PromotionWait;
+                Move promotionMove = *hlMove;
+                graphics->showPromotionSelector(board->getCurrentPlayer(), [this, promotionMove](std::string pieceType) {
+                        Move m(promotionMove.getFrom(), promotionMove.getTo(),
+                            promotionMove.isCastling(), true, promotionMove.isCapture(), pieceType);
+
+                        if (board->makeMove(m))
+                        {
+                            state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
+                            selectedPos = std::nullopt;
+                            graphics->setCellTypeHl(promotionMove.getFrom(), Highlight::LAST_POS);
+                            graphics->setCellTypeHl(promotionMove.getTo(), Highlight::CURRENT_POS);
+                            graphics->hidePromotionSelector();
+                            GameStatus gst = board->getGameStatus();
+                            if (gst == GameStatus::END_GAME)
+                            {
+                                gameEnd();
+                            }
+                            else if (gst == GameStatus::CHECK)
+                            {
+                                board->findPiece("king", board->getCurrentPlayer());
+                                graphics->setCellTypeHl(m.getTo(), Highlight::CHECK_POS);
+                            }
+                        } }, board->getPromotionTypes());
+                return;
+            }
+            else
+            {
+                if (board->makeMove(*hlMove))
+                {
+                    state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
+                    selectedPos = std::nullopt;
+                    graphics->setCellTypeHl(hlMove->getFrom(), Highlight::LAST_POS);
+                    graphics->setCellTypeHl(hlMove->getTo(), Highlight::CURRENT_POS);
+                    GameStatus gst = board->getGameStatus();
+                    if (gst == GameStatus::END_GAME)
+                    {
+                        gameEnd();
+                    }
+                    else if (gst == GameStatus::CHECK)
+                    {
+                        Position kingPos = board->findPiece("king", board->getCurrentPlayer());
+                        graphics->setCellTypeHl(kingPos, Highlight::CHECK_POS);
+                    }
+                    return;
+                }
+            }
+        }
+
+        auto& piece = grid[targetPos.getY()][targetPos.getX()];
+        if (piece && piece->getColor() == board->getCurrentPlayer())
+        {
+            selectedPos = targetPos;
+            graphics->setSelectedPiece(targetPos);
+            hightLightsMoves = board->getSelectableMoves(targetPos);
+            graphics->highlightMoves(hightLightsMoves);
+        }
+        else
+        {
+            state = ControllerState::None;
+            selectedPos = std::nullopt;
+        }
+    }
+}
