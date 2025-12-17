@@ -59,3 +59,27 @@ void Button::draw(sf::RenderWindow& window)
     if (text)
         window.draw(*text);
 }
+
+void Button::handleEvent(const std::optional<sf::Event>& event, const sf::RenderWindow& window)
+{
+    if (event->getIf<sf::Event::MouseMoved>())
+    {
+        sf::Vector2i mouse_pos_i = event->getIf<sf::Event::MouseMoved>()->position;
+        sf::Vector2f mouse_pos = window.mapPixelToCoords(mouse_pos_i);
+
+        bool contains = shape.getGlobalBounds().contains(mouse_pos);
+
+        if (contains != is_hovered)
+        {
+            is_hovered = contains;
+            if (use_texture && hover_texture)
+            {
+                shape.setTexture(is_hovered ? hover_texture : default_texture);
+            }
+            else if (!use_texture)
+            {
+                shape.setFillColor(is_hovered ? hover_color : default_color);
+            }
+        }
+    }
+}
