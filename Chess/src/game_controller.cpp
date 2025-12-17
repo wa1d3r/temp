@@ -44,6 +44,11 @@ GameController::~GameController()
     }
 }
 
+void GameController::setOnGameEnd(std::function<void(void)> onGameEnd)
+{
+    this->onGameEnd = onGameEnd;
+}
+
 void GameController::update()
 {
     if (afterEnd)
@@ -288,4 +293,27 @@ void GameController::onClick(int x, int y)
             selectedPos = std::nullopt;
         }
     }
+}
+
+void GameController::resign()
+{
+    if (board->getGameStatus() == GameStatus::END_GAME)
+        return;
+
+    Color winner = (board->getCurrentPlayer() == Color::White) ? Color::Black : Color::White;
+    gameEnd(winner, " (opponent resign)");
+}
+
+void GameController::gameEnd(std::optional<Color> winner, const std::string& reason)
+{
+    afterEnd = std::make_unique<Clock>(3.f, 0, 0);
+    afterEnd->start();
+    board->timeStop();
+    if (!winner.has_value())
+        winner = board->getWinner();
+
+    if (winner.has_value())
+        graphics->showMessage((winner == Color::White ? "White win!" : "Black win!") + reason);
+    else
+        graphics->showMessage("Draw");
 }
