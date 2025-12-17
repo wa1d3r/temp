@@ -171,3 +171,28 @@ std::string Stockfish::moveToString(const Move& move)
     }
     return res;
 }
+
+std::string Stockfish::getBestMove(const std::string& fen)
+{
+    // Используем FEN вместо moves
+    std::string cmd = "position fen " + fen;
+
+    sendCommand(cmd);
+    sendCommand("go movetime 1000"); // 1 секунда на раздумья
+
+    std::string output = readResponse();
+
+    size_t pos = output.find("bestmove");
+    if (pos != std::string::npos)
+    {
+        std::string moveStr = output.substr(pos + 9, 5);
+        size_t space = moveStr.find(' ');
+        if (space != std::string::npos)
+            moveStr = moveStr.substr(0, space);
+        // Очистка от \n и \r
+        moveStr.erase(std::remove(moveStr.begin(), moveStr.end(), '\n'), moveStr.end());
+        moveStr.erase(std::remove(moveStr.begin(), moveStr.end(), '\r'), moveStr.end());
+        return moveStr;
+    }
+    return "";
+}
