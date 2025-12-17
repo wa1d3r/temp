@@ -47,6 +47,71 @@ class SFMLGraphics : public IGraphicsInterface
         }
     }
 
+    void drawMessageOverlay()
+    {
+        float cellSize = boardArea.size.y / 8.0f;
+        float rectHeight = cellSize * 0.75f;
+        float radius = cellSize * 0.1f;
+
+        const sf::Font* font = resourceManager.getFont("main_font");
+
+        unsigned int charSize = static_cast<unsigned int>(rectHeight * 0.5f);
+        sf::Text text(*font, currentMessage, charSize);
+        text.setFillColor(sf::Color::Black);
+
+        sf::FloatRect textBounds = text.getLocalBounds();
+        text.setOrigin(textBounds.getCenter());
+
+        float padding = cellSize * 0.5f;
+        float rectWidth = textBounds.size.x + padding;
+        if (rectWidth < cellSize * 2.0f)
+            rectWidth = cellSize * 2.0f;
+
+        Position logicalPos(0, 5);
+        Position visualPos = getChangedPos(Position(0, 3));
+
+        float centerX = boardArea.position.x + boardArea.size.x / 2.0f;
+        float centerY = boardArea.position.y + (visualPos.getY() * cellSize) + (cellSize / 2.0f);
+
+        float rectLeft = centerX - rectWidth / 2.0f;
+        float rectTop = centerY - rectHeight / 2.0f;
+
+        sf::RectangleShape horizRect(sf::Vector2f(rectWidth - 2 * radius, rectHeight));
+        horizRect.setPosition(sf::Vector2f(rectLeft + radius, rectTop));
+        horizRect.setFillColor(sf::Color::White);
+
+        sf::RectangleShape vertRect(sf::Vector2f(rectWidth, rectHeight - 2 * radius));
+        vertRect.setPosition(sf::Vector2f(rectLeft, rectTop + radius));
+        vertRect.setFillColor(sf::Color::White);
+
+        sf::CircleShape corner(radius);
+        corner.setFillColor(sf::Color::White);
+
+        window.draw(horizRect);
+        window.draw(vertRect);
+
+        corner.setPosition(sf::Vector2f(rectLeft, rectTop));
+        window.draw(corner);
+        corner.setPosition(sf::Vector2f(rectLeft + rectWidth - 2 * radius, rectTop));
+        window.draw(corner);
+        corner.setPosition(sf::Vector2f(rectLeft + rectWidth - 2 * radius, rectTop + rectHeight - 2 * radius));
+        window.draw(corner);
+        corner.setPosition(sf::Vector2f(rectLeft, rectTop + rectHeight - 2 * radius));
+        window.draw(corner);
+
+        text.setPosition(sf::Vector2f(centerX, centerY));
+        window.draw(text);
+    }
+
+    std::string posToString(Position pos)
+    {
+        if (!pos.isValid())
+            return "--";
+        char col = 'a' + pos.getX();
+        int row = pos.getY() + 1;
+        return std::string(1, col) + std::to_string(row);
+    }
+
 public:
     SFMLGraphics(sf::RenderWindow& win, ResourceManager& rm, Color playerColor)
         : window(win)
@@ -60,6 +125,11 @@ public:
             buf = std::make_unique<sf::RenderTexture>();
         }
         createBoardButtons();
+    }
+
+    void setOnClickCallback(std::function<void(Position)> callback)
+    {
+        onSquareClickCallback = callback;
     }
 
     void createBoardButtons()
@@ -170,11 +240,6 @@ public:
         }
     }
 
-    void setOnClickCallback(std::function<void(Position)> callback)
-    {
-        onSquareClickCallback = callback;
-    }
-
     void setOnResign(std::function<void()> callback) override
     {
         onResignCallback = callback;
@@ -197,6 +262,11 @@ public:
         {
             btn->handleEvent(event, window);
         }
+    }
+
+    void setSelectedPiece(Position pos) override
+    {
+        highlighted[pos.getY() * 8 + pos.getX()] = Highlight::FRAME;
     }
 
     void drawHistoryList(const std::vector<Move>& history)
