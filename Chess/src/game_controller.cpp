@@ -181,22 +181,21 @@ void GameController::update()
         aiThinking = true;
         if (aiThread.joinable())
             aiThread.join();
-        aiThread = std::thread(&GameController::aiThreadFunc, this);
+
+        std::string currentFen = board->getFen();
+        aiThread = std::thread([this, currentFen]() {
+            this->aiThreadFunc(currentFen);
+        });
     }
 }
 
-void GameController::aiThreadFunc()
+void GameController::aiThreadFunc(std::string fen)
 {
     if (stockfish)
     {
-        std::string fen = board->getFen();
-        std::cout << fen << std::endl;
         std::string move = stockfish->getBestMove(fen);
-        std::cout << move << std::endl
-                  << std::endl;
         aiBestMoveStr = move;
     }
-    // Сигнал о завершении
     aiThinking = false;
 }
 
