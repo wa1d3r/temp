@@ -198,6 +198,8 @@ int main()
             mainMenu.resize();
         }
 
+        window.clear();
+
         if (appState == AppState::Menu)
         {
             mainMenu.update();
@@ -206,8 +208,6 @@ int main()
         {
             gameController->update();
         }
-
-        window.clear();
 
         if (appState == AppState::Menu)
         {
