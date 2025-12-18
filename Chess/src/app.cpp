@@ -13,11 +13,10 @@
 int main()
 {
     sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Chess");
-    window.setFramerateLimit(25);
+    window.setFramerateLimit(60);
 
     ResourceManager resourceManager;
 
-    // ... (Загрузка текстур и шрифтов осталась без изменений) ...
     resourceManager.loadFont("main_font", "assets/fonts/MoonlitFlow-Regular.otf");
     resourceManager.loadTexture("cell_white", "assets/textures/white_cell.png");
     resourceManager.loadTexture("cell_black", "assets/textures/black_cell.png");
@@ -61,7 +60,6 @@ int main()
         {
             auto netClient = std::make_unique<NetworkClient>();
 
-            // Получаем IP из конфига
             std::string ip = config.serverIp;
             if (ip.empty())
                 ip = "127.0.0.1";
@@ -93,7 +91,6 @@ int main()
                 int finalGameTypeInt = 0;
                 int finalSeed = 0;
 
-                // Ожидание ответа сервера
                 if (netClient->waitForStart(finalColor, finalTime, finalInc, finalGameTypeInt, finalSeed))
                 {
                     GameType finalGameType = static_cast<GameType>(finalGameTypeInt);
@@ -101,7 +98,6 @@ int main()
                     if (finalGameType != config.gameType)
                     {
                         std::cout << "Error: Game mode mismatch!" << std::endl;
-                        // Ошибка на английском
                         mainMenu.setErrorMessage("Game mode mismatch!");
                         return;
                     }
@@ -116,7 +112,6 @@ int main()
                 }
                 else
                 {
-                    // Сообщение: сервер разорвал соединение
                     std::cout << "Connection failed or server disconnected." << std::endl;
                     mainMenu.setErrorMessage("Server disconnected");
                     return;
@@ -124,7 +119,6 @@ int main()
             }
             else
             {
-                // Сообщение: не удается подключиться
                 std::cout << "Failed to connect." << std::endl;
                 mainMenu.setErrorMessage("Connection failed");
                 return;
@@ -135,7 +129,6 @@ int main()
             stockfish = std::make_unique<Stockfish>("stockfish.exe");
         }
 
-        // ... (Создание игры и контроллера осталось без изменений) ...
         std::unique_ptr<GameMode> gameMode;
         if (config.gameType == GameType::Classic)
             gameMode = std::make_unique<Test>();
@@ -205,15 +198,20 @@ int main()
             mainMenu.resize();
         }
 
+        if (appState == AppState::Menu)
+        {
+            mainMenu.update();
+        }
+        else if (appState == AppState::Game && gameController)
+        {
+            gameController->update();
+        }
+
         window.clear();
 
         if (appState == AppState::Menu)
         {
             mainMenu.draw();
-        }
-        else if (appState == AppState::Game && gameController)
-        {
-            gameController->update();
         }
 
         window.display();
