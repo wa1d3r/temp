@@ -1,4 +1,4 @@
-#include "pieses.h"
+#include "pieces.h"
 
 bool isHold(Position pos, const Piece::board_type& grid)
 {

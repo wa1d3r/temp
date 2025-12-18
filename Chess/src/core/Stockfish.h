@@ -16,10 +16,12 @@ public:
 
 private:
     std::string exePath;
-    HANDLE hChildStd_IN_Rd = NULL;
-    HANDLE hChildStd_IN_Wr = NULL;
-    HANDLE hChildStd_OUT_Rd = NULL;
-    HANDLE hChildStd_OUT_Wr = NULL;
+
+    // Указатели на ресурсы
+    HANDLE hChildStd_IN_Rd = NULL; // Чтение из трубы ввода (для дочернего процесса)
+    HANDLE hChildStd_IN_Wr = NULL; // Запись в трубу ввода (пишет приложение)
+    HANDLE hChildStd_OUT_Rd = NULL; // Чтение из трубы вывода (читает приложение)
+    HANDLE hChildStd_OUT_Wr = NULL; // Запись в трубу вывода (пишет дочерний процесс)
 
     void sendCommand(std::string cmd);
     std::string readResponse();

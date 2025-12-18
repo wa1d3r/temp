@@ -170,7 +170,6 @@ std::string Board::getFen() const
 {
     std::stringstream ss;
 
-    // 1. Положение фигур (оставляем без изменений)
     for (int y = 7; y >= 0; --y)
     {
         int emptyCount = 0;
@@ -200,14 +199,11 @@ std::string Board::getFen() const
             ss << "/";
     }
 
-    // 2. Активный цвет
     ss << (current_player == Color::White ? " w " : " b ");
 
-    // 3. Рокировка (ИСПРАВЛЕНИЕ)
     std::string castling = "";
 
     auto checkCastling = [&](int y, char kLabel, char qLabel) {
-        // Находим позицию короля
         int kingX = -1;
         for (int x = 0; x < 8; ++x)
         {
@@ -217,11 +213,9 @@ std::string Board::getFen() const
                 break;
             }
         }
-        // Если короля нет или он ходил — рокировки нет
         if (kingX == -1 || grid[y][kingX]->isMoved())
             return;
 
-        // Проверяем ладьи
         bool kSideFound = false;
         bool qSideFound = false;
 
@@ -232,10 +226,8 @@ std::string Board::getFen() const
             auto& p = grid[y][x];
             if (p && p->getType() == "rook" && !p->isMoved())
             {
-                // Если ладья справа от короля — это Королевский фланг
                 if (x > kingX)
                     kSideFound = true;
-                // Если ладья слева от короля — это Ферзевый фланг
                 else if (x < kingX)
                     qSideFound = true;
             }
@@ -247,12 +239,11 @@ std::string Board::getFen() const
             castling += qLabel;
     };
 
-    checkCastling(0, 'K', 'Q'); // Белые
-    checkCastling(7, 'k', 'q'); // Черные
+    checkCastling(0, 'K', 'Q');
+    checkCastling(7, 'k', 'q');
 
     ss << (castling.empty() ? "-" : castling) << " ";
 
-    // 4. Взятие на проходе (оставляем без изменений)
     auto lastMoveOpt = getLastMove();
     std::string enPassant = "-";
     if (lastMoveOpt.has_value())
@@ -272,7 +263,6 @@ std::string Board::getFen() const
     }
     ss << enPassant;
 
-    // 5. Полуходы
     ss << " 0 " << (history.size() / 2 + 1);
 
     return ss.str();

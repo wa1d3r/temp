@@ -43,7 +43,7 @@ private:
     // Храним цвет, за который играем
     Color playerColor;
 
-    void aiThreadFunc();
+    void aiThreadFunc(std::string fen);
 
 public:
     GameController(std::unique_ptr<Board> board,

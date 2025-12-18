@@ -44,13 +44,11 @@ bool Position::operator==(const Position& other) const
 int Position::getX() const { return x; }
 int Position::getY() const { return y; }
 
-// Реализация упаковки
 sf::Packet& operator<<(sf::Packet& packet, const Position& pos)
 {
     return packet << pos.getX() << pos.getY();
 }
 
-// Реализация распаковки
 sf::Packet& operator>>(sf::Packet& packet, Position& pos)
 {
     int x, y;

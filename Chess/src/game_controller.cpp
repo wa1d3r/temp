@@ -37,7 +37,7 @@ GameController::~GameController()
 {
     if (isAIGame && stockfish)
     {
-        stockfish->stop(); // Останавливаем процесс, чтобы разблокировать чтение
+        stockfish->stop();
     }
     if (aiThread.joinable())
     {
@@ -115,12 +115,12 @@ void GameController::update()
                     graphics->setCellTypeHl(receivedMove.getFrom(), Highlight::LAST_POS);
                     graphics->setCellTypeHl(receivedMove.getTo(), Highlight::CURRENT_POS);
 
-                    state = ControllerState::None; 
+                    state = ControllerState::None;
 
                     GameStatus gst = board->getGameStatus();
                     if (gst == GameStatus::END_GAME)
                     {
-                        gameEnd(); 
+                        gameEnd();
                     }
                     else if (gst == GameStatus::CHECK)
                     {
@@ -130,12 +130,8 @@ void GameController::update()
                 }
                 else
                 {
-                    std::cerr << "Error: Illegal move received from network" << std::endl;
+                    gameEnd(playerColor, " (incorrect data from opponent)");
                 }
-            }
-            else
-            {
-                std::cerr << "Warning: Received move during my turn!" << std::endl;
             }
         }
 
@@ -236,14 +232,9 @@ Move GameController::stringToMove(std::string moveStr)
         if (m.getTo() == to)
         {
             if (m.isPromotion())
-            {
-                if (m.getPromotionPiece() == promoType)
-                    return m;
-            }
+                return Move(from, to, false, true, false, promoType);
             else
-            {
                 return m;
-            }
         }
     }
     return Move();
@@ -251,7 +242,6 @@ Move GameController::stringToMove(std::string moveStr)
 
 void GameController::onClick(int x, int y)
 {
-    // Блокируем клики, пока думает ИИ
     if (state == ControllerState::OpponentTurn || state == ControllerState::PromotionWait || afterEnd || aiThinking)
         return;
 
@@ -319,8 +309,7 @@ void GameController::onClick(int x, int y)
             {
                 if (board->makeMove(*hlMove))
                 {
-                    // Добавление логики работы с сервером
-                    if(isNetworkGame && network)
+                    if (isNetworkGame && network)
                     {
                         network->sendMove(*hlMove);
                     }

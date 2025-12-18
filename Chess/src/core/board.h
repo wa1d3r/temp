@@ -2,7 +2,7 @@
 #include "Clock.h"
 #include "game_mode.h"
 #include "move.h"
-#include "pieses.h"
+#include "pieces.h"
 #include <iostream>
 #include <optional>
 #include <sstream>

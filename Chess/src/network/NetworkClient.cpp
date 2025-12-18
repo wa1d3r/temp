@@ -22,14 +22,12 @@ bool NetworkClient::connect(const std::string& ip, unsigned short port)
     {
         if (socket.connect(*resolvedIp, port) == sf::Socket::Status::Done)
         {
-            std::cout << "Connected to server " << ip << ":" << port << std::endl;
             connected = true;
             socket.setBlocking(false);
             return true;
         }
     }
 
-    std::cerr << "Failed to connect to " << ip << ":" << port << std::endl;
     connected = false;
     return false;
 }
@@ -57,7 +55,6 @@ bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& in
     if (!connected)
         return false;
 
-    std::cout << "Waiting for game start (Blocking mode)..." << std::endl;
     socket.setBlocking(true);
 
     bool gameStarted = false;
@@ -69,7 +66,6 @@ bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& in
 
         if (status == sf::Socket::Status::Disconnected)
         {
-            std::cout << "Server disconnected." << std::endl;
             return false;
         }
 
@@ -86,16 +82,10 @@ bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& in
                     if (packet >> colorInt >> timeMinutes >> incrementSeconds >> gameType >> seed)
                     {
                         assignedColor = (colorInt == 0) ? Color::White : Color::Black;
-                        std::cout << "Config received: "
-                                  << (colorInt == 0 ? "White" : "Black")
-                                  << ", " << timeMinutes << "m+" << incrementSeconds << "s"
-                                  << ", Mode: " << gameType << ", Seed: " << seed
-                                  << std::endl;
                     }
                 }
                 else if (type == PacketType::StartGame)
                 {
-                    std::cout << "Game Started!" << std::endl;
                     gameStarted = true;
                 }
             }
@@ -113,7 +103,7 @@ void NetworkClient::sendMove(const Move& move)
 
     sf::Packet packet;
     packet << static_cast<int>(PacketType::Move) << move;
-
+    
     if (socket.send(packet) != sf::Socket::Status::Done)
     {
         std::cout << "Warning: Failed to send move packet." << std::endl;

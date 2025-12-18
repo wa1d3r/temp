@@ -89,7 +89,7 @@ void ChessServer::abortGame()
         selector.remove(*client);
         client->disconnect();
     }
-    clients.clear(); // Очистка вектора, которая ломала итератор
+    clients.clear();
     clientsReady[0] = false;
     clientsReady[1] = false;
 }
@@ -140,11 +140,8 @@ void ChessServer::handleClientActivity()
 
             if (status == sf::Socket::Status::Done)
             {
-                // ИСПРАВЛЕНИЕ: Проверяем, вернул ли processPacket false
                 if (!processPacket(socket, packet))
                 {
-                    // Если false (abortGame сработал), вектор clients пуст.
-                    // Выходим из цикла, чтобы не делать ++it.
                     break;
                 }
                 ++it;
@@ -170,7 +167,6 @@ void ChessServer::handleClientActivity()
     }
 }
 
-// Теперь возвращает bool
 bool ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
 {
     int typeInt;
@@ -228,14 +224,12 @@ bool ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
                         std::cerr << "Mode mismatch: Host(" << clientGameTypes[0]
                                   << ") vs Guest(" << clientGameTypes[1] << ")" << std::endl;
                         abortGame();
-                        // Возвращаем false, чтобы прервать цикл в handleClientActivity
                         return false;
                     }
                 }
             }
         }
     }
-    // По умолчанию продолжаем цикл
     return true;
 }
 

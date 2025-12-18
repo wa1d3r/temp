@@ -14,41 +14,55 @@ Stockfish::~Stockfish()
 
 bool Stockfish::start()
 {
-    SECURITY_ATTRIBUTES saAttr;
-    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
+    SECURITY_ATTRIBUTES saAttr; // параметры безопасности объекта
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); // требование WinAPI
+    saAttr.bInheritHandle = TRUE; // разришить наследование дочернему процессу
+    saAttr.lpSecurityDescriptor = NULL; // Дескриптор безопасности по умолчанию
 
+    // труба для вывода данных от дочернего процесса
     if (!CreatePipe(&hChildStd_OUT_Rd, &hChildStd_OUT_Wr, &saAttr, 0))
         return false;
+
+    // дескриптор для чтения не наследуется, чтобы stockfish не читал сам себя
     if (!SetHandleInformation(hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0))
         return false;
+
+    // ввод данных в дочерний процесс
     if (!CreatePipe(&hChildStd_IN_Rd, &hChildStd_IN_Wr, &saAttr, 0))
         return false;
+
+    // дескриптор для записи не наследуется, чтобы stockfish не писал сам себе
     if (!SetHandleInformation(hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0))
         return false;
 
-    STARTUPINFOA siStartInfo;
-    ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
-    siStartInfo.cb = sizeof(STARTUPINFO);
-    siStartInfo.hStdError = hChildStd_OUT_Wr;
+    STARTUPINFOA siStartInfo; // параметры запуска процесса
+    ZeroMemory(&siStartInfo, sizeof(STARTUPINFO)); // Обнуляем память структуры
+    siStartInfo.cb = sizeof(STARTUPINFO); // Указываем размер
+
+    // Подмена стандартных потоков, на созданные
+    siStartInfo.hStdError = hChildStd_OUT_Wr; 
     siStartInfo.hStdOutput = hChildStd_OUT_Wr;
     siStartInfo.hStdInput = hChildStd_IN_Rd;
+
+    // указание использовать прописанные дескрипторы
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-    PROCESS_INFORMATION piProcInfo;
+    PROCESS_INFORMATION piProcInfo; // Информация о созданном процессе
     ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
 
+    // запуск процесса
     if (!CreateProcessA(NULL, const_cast<char*>(exePath.c_str()), NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo))
     {
         return false;
     }
 
+    // закрытие дескрипторов процесса и потока
     CloseHandle(piProcInfo.hProcess);
     CloseHandle(piProcInfo.hThread);
     CloseHandle(hChildStd_OUT_Wr);
     CloseHandle(hChildStd_IN_Rd);
 
+    // Инициализация протокола UCI
     sendCommand("uci");
     sendCommand("isready");
     return true;
@@ -57,6 +71,8 @@ bool Stockfish::start()
 void Stockfish::stop()
 {
     sendCommand("quit");
+
+    // закрытие труб
     if (hChildStd_IN_Wr)
     {
         CloseHandle(hChildStd_IN_Wr);
@@ -73,8 +89,10 @@ void Stockfish::sendCommand(std::string cmd)
 {
     if (!hChildStd_IN_Wr)
         return;
-    DWORD dwWritten;
+    DWORD dwWritten; // количество записанных байт (требование)
     cmd += "\n";
+
+    // запись в ввод движка
     WriteFile(hChildStd_IN_Wr, cmd.c_str(), cmd.length(), &dwWritten, NULL);
 }
 
@@ -82,14 +100,17 @@ std::string Stockfish::readResponse()
 {
     if (!hChildStd_OUT_Rd)
         return "";
-    DWORD dwRead;
-    CHAR chBuf[4096];
+    DWORD dwRead;  // количество прочитанных байт
+    CHAR chBuf[4096]; 
     std::string result;
 
     while (true)
     {
+        // Если чтение не удалось — выход
         if (!ReadFile(hChildStd_OUT_Rd, chBuf, 4096, &dwRead, NULL) || dwRead == 0)
             break;
+
+        // останавливаемся на найденном ходе
         result.append(chBuf, dwRead);
         if (result.find("bestmove") != std::string::npos)
             break;
@@ -116,13 +137,12 @@ std::string Stockfish::moveToString(const Move& move)
 
 std::string Stockfish::getBestMove(const std::string& fen)
 {
-    // ���������� FEN ������ moves
     std::string cmd = "position fen " + fen;
 
     sendCommand(cmd);
-    sendCommand("go movetime 1000"); // 1 ������� �� ��������
+    sendCommand("go movetime 1000"); // 1 секунда на поиск хода
 
-    std::string output = readResponse();
+    std::string output = readResponse(); // ожидание ответа
 
     size_t pos = output.find("bestmove");
     if (pos != std::string::npos)
@@ -131,7 +151,6 @@ std::string Stockfish::getBestMove(const std::string& fen)
         size_t space = moveStr.find(' ');
         if (space != std::string::npos)
             moveStr = moveStr.substr(0, space);
-        // ������� �� \n � \r
         moveStr.erase(std::remove(moveStr.begin(), moveStr.end(), '\n'), moveStr.end());
         moveStr.erase(std::remove(moveStr.begin(), moveStr.end(), '\r'), moveStr.end());
         return moveStr;

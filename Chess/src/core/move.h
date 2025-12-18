@@ -32,8 +32,5 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Move& m);
 };
 
-// Оператор для ЗАПИСИ хода в пакет (Сериализация)
 sf::Packet& operator<<(sf::Packet& packet, const Move& move);
-
-// Оператор для ЧТЕНИЯ хода из пакета (Десериализация)
 sf::Packet& operator>>(sf::Packet& packet, Move& move);

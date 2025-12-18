@@ -131,7 +131,7 @@ int main()
 
         std::unique_ptr<GameMode> gameMode;
         if (config.gameType == GameType::Classic)
-            gameMode = std::make_unique<Test>();
+            gameMode = std::make_unique<Сlassic>();
         else
             gameMode = std::make_unique<Fischer>(config.seed);
 

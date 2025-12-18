@@ -1,5 +1,5 @@
 #pragma once
-#include "../core/pieses.h"
+#include "../core/pieces.h"
 #include "../graphic/InputBox.h"
 #include "../graphic/ResourceManager.h"
 #include "../graphic/button.h"
@@ -44,7 +44,6 @@ enum class MenuScreen
 {
     Main,
     GameSetup,
-    Settings,
     About
 };
 
@@ -65,11 +64,12 @@ class MainMenu
     MenuScreen currentScreen;
     GameConfig currentConfig;
 
+    // Коллекции UI элементов
     std::vector<std::unique_ptr<Button>> mainButtons;
     std::vector<std::unique_ptr<Button>> setupButtons;
     std::vector<std::unique_ptr<Button>> backButton;
 
-    std::vector<std::unique_ptr<InputBox>> inputBoxes;
+    std::vector<std::unique_ptr<InputBox>> inputBoxes; // Поля ввода (время, IP)
     std::vector<sf::Text> labels;
 
     std::unique_ptr<sf::Sprite> backgroundSprite;
@@ -80,18 +80,17 @@ class MainMenu
     std::function<void(GameConfig)> onStartGame;
     std::function<void()> onExit;
 
-    // --- �������� ---
+    // --- Анимация ---
     sf::Clock dtClock;
-    float idleTimer;
-    AnimType currentAnim;
+    float idleTimer;          // Время простоя для запуска анимации
+    AnimType currentAnim;     // Текущая активная анимация
 
     sf::Sprite animSprite1;
     sf::Sprite animSprite2;
 
     float animStateTime;
-    float animPhase;
     bool animFlag;
-    bool secondActorActive; // <-- ����� ���� ��� �������� �����
+    bool secondActorActive;
 
 public:
     MainMenu(sf::RenderWindow& win, ResourceManager& rm);

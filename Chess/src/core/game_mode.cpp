@@ -1,7 +1,7 @@
 #include "game_mode.h"
 
 std::unique_ptr<Piece>
-Test::clonePiece(const Piece& piece) const
+GameMode::clonePiece(const Piece& piece) const
 {
     PieceFactory pf;
     pf.registration<Pawn>("pawn");
@@ -14,45 +14,7 @@ Test::clonePiece(const Piece& piece) const
     return pf.create(piece.getType(), piece.getColor(), piece.getPosition(), piece.isMoved());
 }
 
-void Test::initializeBoard(Piece::board_type& board)
-{
-    board.resize(8);
-    for (auto& row : board)
-    {
-        row.resize(8);
-    }
-
-    PieceFactory pf;
-    pf.registration<Pawn>("pawn");
-    pf.registration<Rook>("rook");
-    pf.registration<Knight>("knight");
-    pf.registration<Bishop>("bishop");
-    pf.registration<Queen>("queen");
-    pf.registration<King>("king");
-    for (int i = 0; i < 8; i++)
-    {
-        board[1][i] = pf.create("pawn", Color::White, Position(i, 1));
-        board[6][i] = pf.create("pawn", Color::Black, Position(i, 6));
-    }
-    board[0][0] = pf.create("rook", Color::White, Position(0, 0));
-    board[0][7] = pf.create("rook", Color::White, Position(7, 0));
-    board[7][0] = pf.create("rook", Color::Black, Position(0, 7));
-    board[7][7] = pf.create("rook", Color::Black, Position(7, 7));
-    board[0][1] = pf.create("knight", Color::White, Position(1, 0));
-    board[0][6] = pf.create("knight", Color::White, Position(6, 0));
-    board[7][1] = pf.create("knight", Color::Black, Position(1, 7));
-    board[7][6] = pf.create("knight", Color::Black, Position(6, 7));
-    board[0][2] = pf.create("bishop", Color::White, Position(2, 0));
-    board[0][5] = pf.create("bishop", Color::White, Position(5, 0));
-    board[7][2] = pf.create("bishop", Color::Black, Position(2, 7));
-    board[7][5] = pf.create("bishop", Color::Black, Position(5, 7));
-    board[0][3] = pf.create("queen", Color::White, Position(3, 0));
-    board[7][3] = pf.create("queen", Color::Black, Position(3, 7));
-    board[0][4] = pf.create("king", Color::White, Position(4, 0));
-    board[7][4] = pf.create("king", Color::Black, Position(4, 7));
-}
-
-void Test::move(Piece::board_type& board, Move move, std::optional<Color> currentPlayer)
+void GameMode::move(Piece::board_type& board, Move move, std::optional<Color> currentPlayer)
 {
     Position from = move.getFrom();
     Position to = move.getTo();
@@ -91,7 +53,7 @@ void Test::move(Piece::board_type& board, Move move, std::optional<Color> curren
     }
 }
 
-bool Test::isValidMove(const Piece::board_type& board, Color color, Move move, std::optional<Move> lastMove)
+bool GameMode::isValidMove(const Piece::board_type& board, Color color, Move move, std::optional<Move> lastMove)
 {
     if (move.isCastling())
     {
@@ -121,14 +83,14 @@ bool Test::isValidMove(const Piece::board_type& board, Color color, Move move, s
     }
 
     auto tempGrid = copyBoard(board);
-    this->move(tempGrid, move);
+    this->move(tempGrid, move, std::nullopt);
     if (isInCheck(tempGrid, color, move))
         return false;
 
     return true;
 }
 
-bool Test::isCheckmate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
+bool GameMode::isCheckmate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
 {
     if (!isInCheck(board, color, lastMove))
     {
@@ -148,7 +110,7 @@ bool Test::isCheckmate(const Piece::board_type& board, Color color, std::optiona
     return true;
 }
 
-Piece::board_type Test::copyBoard(const Piece::board_type& board) const
+Piece::board_type GameMode::copyBoard(const Piece::board_type& board) const
 {
     Piece::board_type board_copy;
     board_copy.resize(8);
@@ -168,14 +130,14 @@ Piece::board_type Test::copyBoard(const Piece::board_type& board) const
     return board_copy;
 }
 
-bool Test::ceilInCheck(const Piece::board_type& board, std::vector<Move> enemy_moves, Position pos) const
+bool GameMode::ceilInCheck(const Piece::board_type& board, std::vector<Move> enemy_moves, Position pos) const
 {
     return enemy_moves.end() != std::find_if(enemy_moves.begin(), enemy_moves.end(), [pos](const Move& move) {
         return move.getTo() == pos;
     });
 }
 
-bool Test::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
+bool GameMode::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
 {
     Position king_pos;
     for (const auto& row : board)
@@ -194,7 +156,7 @@ bool Test::isInCheck(const Piece::board_type& board, Color color, std::optional<
     return ceilInCheck(board, enemy_moves, king_pos);
 }
 
-std::vector<Move> Test::getAllMoves(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
+std::vector<Move> GameMode::getAllMoves(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
 {
     std::vector<Move> all_moves;
     for (const auto& row : board)
@@ -212,14 +174,14 @@ std::vector<Move> Test::getAllMoves(const Piece::board_type& board, Color color,
     return all_moves;
 }
 
-bool Test::isStalemate(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
+bool GameMode::isStalemate(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
 {
     if (isInCheck(board, color, lastMove))
     {
         return false;
     }
 
-    auto* nonConstThis = const_cast<Test*>(this);
+    auto* nonConstThis = const_cast<GameMode*>(this);
     std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
 
     for (const Move& move : all_possible_moves)
@@ -233,14 +195,20 @@ bool Test::isStalemate(const Piece::board_type& board, Color color, std::optiona
     return true;
 }
 
-const std::vector<std::string>& Test::getPromotionTypes() const
+const std::vector<std::string>& GameMode::getPromotionTypes() const
 {
     return promotionTypes;
 }
 
 
-std::unique_ptr<Piece> Fischer::clonePiece(const Piece& piece) const
+void Ñlassic::initializeBoard(Piece::board_type& board)
 {
+    board.resize(8);
+    for (auto& row : board)
+    {
+        row.resize(8);
+    }
+
     PieceFactory pf;
     pf.registration<Pawn>("pawn");
     pf.registration<Rook>("rook");
@@ -248,9 +216,29 @@ std::unique_ptr<Piece> Fischer::clonePiece(const Piece& piece) const
     pf.registration<Bishop>("bishop");
     pf.registration<Queen>("queen");
     pf.registration<King>("king");
-
-    return pf.create(piece.getType(), piece.getColor(), piece.getPosition(), piece.isMoved());
+    for (int i = 0; i < 8; i++)
+    {
+        board[1][i] = pf.create("pawn", Color::White, Position(i, 1));
+        board[6][i] = pf.create("pawn", Color::Black, Position(i, 6));
+    }
+    board[0][0] = pf.create("rook", Color::White, Position(0, 0));
+    board[0][7] = pf.create("rook", Color::White, Position(7, 0));
+    board[7][0] = pf.create("rook", Color::Black, Position(0, 7));
+    board[7][7] = pf.create("rook", Color::Black, Position(7, 7));
+    board[0][1] = pf.create("knight", Color::White, Position(1, 0));
+    board[0][6] = pf.create("knight", Color::White, Position(6, 0));
+    board[7][1] = pf.create("knight", Color::Black, Position(1, 7));
+    board[7][6] = pf.create("knight", Color::Black, Position(6, 7));
+    board[0][2] = pf.create("bishop", Color::White, Position(2, 0));
+    board[0][5] = pf.create("bishop", Color::White, Position(5, 0));
+    board[7][2] = pf.create("bishop", Color::Black, Position(2, 7));
+    board[7][5] = pf.create("bishop", Color::Black, Position(5, 7));
+    board[0][3] = pf.create("queen", Color::White, Position(3, 0));
+    board[7][3] = pf.create("queen", Color::Black, Position(3, 7));
+    board[0][4] = pf.create("king", Color::White, Position(4, 0));
+    board[7][4] = pf.create("king", Color::Black, Position(4, 7));
 }
+
 
 void Fischer::initializeBoard(Piece::board_type& board)
 {
@@ -468,110 +456,4 @@ bool Fischer::isValidMove(const Piece::board_type& board, Color color, Move move
         return false;
 
     return true;
-}
-
-bool Fischer::isCheckmate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
-{
-    if (!isInCheck(board, color, lastMove))
-        return false;
-
-    std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
-
-    for (const Move& move : all_possible_moves)
-    {
-        if (isValidMove(board, color, move, lastMove))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-Piece::board_type Fischer::copyBoard(const Piece::board_type& board) const
-{
-    Piece::board_type board_copy;
-    board_copy.resize(8);
-
-    for (int y = 0; y < 8; y++)
-    {
-        board_copy[y].resize(8);
-        for (int x = 0; x < 8; x++)
-        {
-            if (board[y][x])
-            {
-                board_copy[y][x] = clonePiece(*board[y][x]);
-            }
-        }
-    }
-
-    return board_copy;
-}
-
-bool Fischer::ceilInCheck(const Piece::board_type& board, std::vector<Move> enemy_moves, Position pos) const
-{
-    return enemy_moves.end() != std::find_if(enemy_moves.begin(), enemy_moves.end(), [pos](const Move& move) {
-        return move.getTo() == pos;
-    });
-}
-
-bool Fischer::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
-{
-    Position king_pos;
-    for (const auto& row : board)
-    {
-        auto it = std::find_if(
-            row.begin(),
-            row.end(),
-            [color](const auto& piece) {
-                return piece && piece->getColor() == color && piece->getType() == "king";
-            });
-        if (it != row.end())
-            king_pos = it->get()->getPosition();
-    }
-
-    std::vector<Move> enemy_moves = getAllMoves(board, (color == Color::White) ? Color::Black : Color::White, lastMove);
-    return ceilInCheck(board, enemy_moves, king_pos);
-}
-
-std::vector<Move> Fischer::getAllMoves(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
-{
-    std::vector<Move> all_moves;
-    for (const auto& row : board)
-    {
-        for (const auto& piece : row)
-        {
-            if (piece && piece->getColor() == color)
-            {
-                std::vector<Move> piece_moves = piece->getPossibleMoves(board, lastMove);
-                all_moves.insert(all_moves.end(), piece_moves.begin(), piece_moves.end());
-            }
-        }
-    }
-
-    return all_moves;
-}
-
-bool Fischer::isStalemate(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
-{
-    if (isInCheck(board, color, lastMove))
-        return false;
-
-    auto* nonConstThis = const_cast<Fischer*>(this);
-    std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
-
-    for (const Move& move : all_possible_moves)
-    {
-        if (nonConstThis->isValidMove(board, color, move, lastMove))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-const std::vector<std::string>& Fischer::getPromotionTypes() const
-{
-    return promotionTypes;
 }

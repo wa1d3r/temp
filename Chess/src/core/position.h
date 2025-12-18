@@ -19,8 +19,5 @@ public:
     ~Position() = default;
 };
 
-// Оператор упаковки (Запись)
 sf::Packet& operator<<(sf::Packet& packet, const Position& pos);
-
-// Оператор распаковки (Чтение)
 sf::Packet& operator>>(sf::Packet& packet, Position& pos);

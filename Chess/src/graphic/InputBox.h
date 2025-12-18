@@ -30,6 +30,5 @@ public:
     std::string getString() const;
     void setOnChange(std::function<void(std::string)> callback);
 
-    // Хелпер для получения float значения (например, минут)
     float getFloatValue() const;
 };

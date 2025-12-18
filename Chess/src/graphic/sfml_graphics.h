@@ -68,7 +68,6 @@ class SFMLGraphics : public IGraphicsInterface
         if (rectWidth < cellSize * 2.0f)
             rectWidth = cellSize * 2.0f;
 
-        Position logicalPos(0, 5);
         Position visualPos = getChangedPos(Position(0, 3));
 
         float centerX = boardArea.position.x + boardArea.size.x / 2.0f;
@@ -138,7 +137,6 @@ public:
         boardButtons.clear();
         sf::Vector2u winSize = window.getSize();
 
-        // ... (код загрузки фона и расчета масштаба остается тем же) ...
         const sf::Texture* bgTex = resourceManager.getTexture("background");
         backgroundSprite = std::make_unique<sf::Sprite>(*bgTex);
         float scaleX = static_cast<float>(winSize.x) / bgTex->getSize().x;
@@ -149,7 +147,6 @@ public:
         float winW = static_cast<float>(winSize.x);
         float winH = static_cast<float>(winSize.y);
 
-        // Параметры верстки
         float marginRatio = 0.05f;
         float clockWidthRatio = 0.25f;
         float clockGapRatio = 0.05f;
@@ -168,10 +165,9 @@ public:
         float buttonHeight = boardSide * 0.10f;
         float spacing = boardSide * 0.02f; // Отступы между элементами
 
-        // Остаток места под историю: Общая высота - 2 часов - кнопка - отступы
+        // Остаток места под историю
         float historyHeight = boardSide - (2 * clockHeight) - buttonHeight - (3 * spacing);
 
-        // Координаты
         float totalGroupWidth = boardSide + (boardSide * clockGapRatio) + clockWidth;
         float startX = (winW - totalGroupWidth) / 2.0f;
         float startY = (winH - boardSide) / 2.0f;
@@ -179,18 +175,18 @@ public:
         boardArea = sf::FloatRect(sf::Vector2f(startX, startY), sf::Vector2f(boardSide, boardSide));
         float rightPanelX = startX + boardSide + (boardSide * clockGapRatio);
 
-        // 1. Верхние часы (Черные)
+        // Верхние часы
         topClockArea = sf::FloatRect(sf::Vector2f(rightPanelX, startY), sf::Vector2f(clockWidth, clockHeight));
 
-        // 2. История ходов (Между часами)
+        // История ходов
         float historyY = startY + clockHeight + spacing;
         historyArea = sf::FloatRect(sf::Vector2f(rightPanelX, historyY), sf::Vector2f(clockWidth, historyHeight));
 
-        // 3. Нижние часы (Белые)
+        // Нижние часы
         float bottomClockY = historyY + historyHeight + spacing;
         bottomClockArea = sf::FloatRect(sf::Vector2f(rightPanelX, bottomClockY), sf::Vector2f(clockWidth, clockHeight));
 
-        // 4. Кнопка "Сдаться" (В самом низу)
+        // Кнопка "Сдаться"
         float buttonY = bottomClockY + clockHeight + spacing;
 
         sf::Vector2f btnRelPos(rightPanelX / winW, buttonY / winH);
@@ -201,10 +197,9 @@ public:
             [this]() { if (onResignCallback) onResignCallback(); },
             "Resign", static_cast<unsigned int>(buttonHeight * 0.4f),
             resourceManager.getFont("main_font"),
-            sf::Color(200, 100, 100), sf::Color(255, 100, 100), // Красные оттенки
+            sf::Color(200, 100, 100), sf::Color(255, 100, 100),
             sf::Color::White, sf::Color::Black);
 
-        // ... (код создания кнопок доски остается тем же) ...
         auto texSize = resourceManager.getTexture("pawn_white")->getSize();
         for (auto& buf : cellBuffers)
         {
@@ -272,10 +267,9 @@ public:
 
     void drawHistoryList(const std::vector<Move>& history)
     {
-        // Фон окна истории
         sf::RectangleShape bg(historyArea.size);
         bg.setPosition(historyArea.position);
-        bg.setFillColor(sf::Color(0, 0, 0, 150)); // Полупрозрачный черный
+        bg.setFillColor(sf::Color(0, 0, 0, 150));
         bg.setOutlineColor(sf::Color::White);
         bg.setOutlineThickness(2.0f);
         window.draw(bg);
@@ -288,7 +282,6 @@ public:
         float lineSpacing = charSize * 1.2f;
         int maxLines = static_cast<int>(historyArea.size.y / lineSpacing);
 
-        // Рисуем последние N ходов, которые влезают
         int startIdx = 0;
         if (history.size() > maxLines)
         {
@@ -415,7 +408,6 @@ public:
         bool isTopActive = currentPlayer != viewColor;
 
         drawClock(topTime, topClockArea, resourceManager.getTexture(isTopActive ? "active_clock" : "disactive_clock"));
-
         drawClock(bottomTime, bottomClockArea, resourceManager.getTexture(isTopActive ? "disactive_clock" : "active_clock"));
 
         if (isPromotionActive)
