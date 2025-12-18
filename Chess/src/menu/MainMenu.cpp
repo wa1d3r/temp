@@ -3,12 +3,22 @@
 #include <iostream>
 #include <sstream>
 
+// Инициализируем errorText шрифтом прямо в списке инициализации
 MainMenu::MainMenu(sf::RenderWindow& win, ResourceManager& rm)
     : window(win)
     , resourceManager(rm)
     , currentScreen(MenuScreen::Main)
+    , errorText(*rm.getFont("main_font")) // <-- Исправление ошибки конструктора
 {
     backgroundSprite = std::make_unique<sf::Sprite>(*resourceManager.getTexture("background"));
+
+    // Настраиваем стиль текста ошибки
+    errorText.setCharacterSize(30); // Чуть крупнее для заметности
+    errorText.setFillColor(sf::Color::Red);
+    // Обводка для читаемости на любом фоне
+    errorText.setOutlineColor(sf::Color::Black);
+    errorText.setOutlineThickness(2.0f);
+
     resize();
 }
 
@@ -21,17 +31,27 @@ void MainMenu::resize()
     initButtons();
 }
 
-// Хелпер создания меток
+void MainMenu::setErrorMessage(const std::string& message)
+{
+    errorText.setString(message);
+
+    // Центрируем точку привязки текста
+    sf::FloatRect bounds = errorText.getLocalBounds();
+    errorText.setOrigin(bounds.getCenter());
+
+    // Устанавливаем позицию: центр по ширине, 10% отступа сверху
+    // Ничего не сдвигаем, текст просто рисуется поверх
+    errorText.setPosition(sf::Vector2f(window.getSize().x / 2.0f, window.getSize().y * 0.1f));
+}
+
 void MainMenu::createLabel(float x, float y, const std::string& str, unsigned int size)
 {
     sf::Text text(*resourceManager.getFont("main_font"), str);
     text.setCharacterSize(size);
-    text.setFillColor(sf::Color(200, 200, 200)); // Светло-серый
+    text.setFillColor(sf::Color(200, 200, 200));
 
-    // Позиционируем по координатам экрана (проценты -> пиксели)
-    sf::FloatRect bounds = text.getLocalBounds();
+    // Позиционируем по координатам экрана
     text.setPosition(sf::Vector2f(window.getSize().x * x, window.getSize().y * y));
-
     labels.push_back(text);
 }
 
@@ -47,13 +67,16 @@ std::unique_ptr<Button> MainMenu::createBtn(sf::Vector2f pos, sf::Vector2f size,
 
 void MainMenu::initButtons()
 {
+    // Очищаем ошибку при обновлении меню (смене экрана)
+    errorText.setString("");
+
     sf::Vector2u winSize = window.getSize();
     mainButtons.clear();
     setupButtons.clear();
     aboutButtons.clear();
     backButton.clear();
     inputBoxes.clear();
-    labels.clear(); // Очищаем метки
+    labels.clear();
 
     float btnW = 0.3f;
     float btnH = 0.08f;
@@ -137,24 +160,19 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
 
     row += 0.15f;
 
-    // 3. CUSTOM TIME INPUTS (Создаем до пресетов, чтобы пресеты могли их обновлять)
+    // 3. TIME INPUTS
     const sf::Font* font = resourceManager.getFont("main_font");
-    float customRow = row + 0.16f; // Сдвигаем ниже пресетов
-    float labelYOffset = 0.01f; // Подстройка по вертикали для текста
+    float customRow = row + 0.16f;
+    float labelYOffset = 0.01f;
 
-    // Ширины элементов
     float labelW = 0.15f;
     float inputW = 0.10f;
 
-    // Координаты для Min
     float minLabelX = 0.15f;
-    float minInputX = minLabelX + labelW; // Сразу после надписи
-
-    // Координаты для Inc
+    float minInputX = minLabelX + labelW;
     float incLabelX = 0.55f;
     float incInputX = incLabelX + labelW;
 
-    // Создаем InputBox
     auto minInput = std::make_unique<InputBox>(
         sf::Vector2f(winSize.x * minInputX, winSize.y * customRow),
         sf::Vector2f(winSize.x * inputW, winSize.y * 0.06f),
@@ -168,11 +186,9 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     InputBox* pMinInput = minInput.get();
     InputBox* pIncInput = incInput.get();
 
-    // Создаем надписи (Labels)
     createLabel(minLabelX, customRow + labelYOffset, "Custom Min:");
     createLabel(incLabelX, customRow + labelYOffset, "Inc (sec):");
 
-    // Обработчики ввода
     pMinInput->setOnChange([this](std::string val) {
         try
         {
@@ -192,7 +208,7 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
         }
     });
 
-    // 4. TIME PRESETS
+    // 4. PRESETS
     auto timeBtn = [&](std::string txt, float m, float inc, float x, float y) {
         bool selected = (std::abs(currentConfig.timeMinutes - m) < 0.01f && std::abs(currentConfig.incrementSeconds - inc) < 0.01f);
 
@@ -206,7 +222,6 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
                 initButtons(); }, selected ? sf::Color::Green : sf::Color::White));
     };
 
-    // Ряд 1
     timeBtn("1 + 0", 1, 0, 0.1f, row);
     timeBtn("3 + 0", 3, 0, 0.27f, row);
     timeBtn("3 + 2", 3, 2, 0.44f, row);
@@ -214,19 +229,55 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     timeBtn("5 + 3", 5, 3, 0.78f, row);
 
     row += 0.08f;
-    // Ряд 2
     timeBtn("10 + 0", 10, 0, 0.1f, row);
     timeBtn("10 + 5", 10, 5, 0.27f, row);
     timeBtn("15 + 10", 15, 10, 0.44f, row);
     timeBtn("30 + 0", 30, 0, 0.61f, row);
     timeBtn("30 + 20", 30, 20, 0.78f, row);
 
-    // Добавляем инпуты в общий список
     inputBoxes.push_back(std::move(minInput));
     inputBoxes.push_back(std::move(incInput));
 
+    // --- 5. IP INPUT (Если выбран Network) ---
+    // Поле ввода размещаем ниже, чтобы не накладываться на время
+    float nextRow = customRow + 0.10f;
+
+    if (currentConfig.opponentType == OpponentType::Network)
+    {
+        float ipLabelX = 0.3f;
+        float ipInputX = 0.45f;
+        float ipInputW = 0.25f;
+
+        createLabel(ipLabelX, nextRow + labelYOffset, "Server IP:");
+
+        // limit 15 символов для IPv4
+        auto ipInput = std::make_unique<InputBox>(
+            sf::Vector2f(winSize.x * ipInputX, winSize.y * nextRow),
+            sf::Vector2f(winSize.x * ipInputW, winSize.y * 0.06f),
+            *font, currentConfig.serverIp, true, 15);
+
+        ipInput->setOnChange([this](std::string val) {
+            currentConfig.serverIp = val;
+        });
+
+        inputBoxes.push_back(std::move(ipInput));
+
+        // Кнопку старт сдвигаем ниже, только если появилось поле IP
+        nextRow += 0.1f;
+    }
+    else
+    {
+        // Если поля нет, кнопка будет чуть выше
+        nextRow += 0.05f;
+    }
+
     // START BUTTON
-    setupButtons.push_back(createBtn({ 0.35f, 0.85f }, { 0.3f, 0.1f }, "START GAME", [this]() {
+    // Позиция Y зависит от nextRow, чтобы не наехать на IP
+    float startBtnY = (nextRow > 0.85f) ? 0.90f : 0.85f;
+    if (startBtnY > 0.88f)
+        startBtnY = 0.88f; // Ограничиваем, чтобы не улетела совсем вниз
+
+    setupButtons.push_back(createBtn({ 0.35f, startBtnY }, { 0.3f, 0.1f }, "START GAME", [this]() {
         if (onStartGame) {
             if (currentConfig.isRandomColor) {
                 currentConfig.playerColor = (rand() % 2 == 0) ? Color::White : Color::Black;
@@ -283,9 +334,12 @@ void MainMenu::draw()
             btn->draw(window);
         for (auto& box : inputBoxes)
             box->draw(window);
-        // Рисуем метки
         for (auto& label : labels)
             window.draw(label);
+
+        // Рисуем сообщение об ошибке (сверху, поверх всего)
+        if (!errorText.getString().isEmpty())
+            window.draw(errorText);
     }
     else if (currentScreen == MenuScreen::About)
     {

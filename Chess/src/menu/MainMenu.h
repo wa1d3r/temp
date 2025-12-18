@@ -8,7 +8,6 @@
 #include <memory>
 #include <vector>
 
-// ... (Остальные enum и struct без изменений) ...
 enum class AppState
 {
     Menu,
@@ -37,6 +36,7 @@ struct GameConfig
     float timeMinutes = 10.0f;
     float incrementSeconds = 5.0f;
     int seed = 0;
+    std::string serverIp = "127.0.0.1"; // <-- Поле для IP
 };
 
 enum class MenuScreen
@@ -61,9 +61,11 @@ class MainMenu
     std::vector<std::unique_ptr<Button>> backButton;
 
     std::vector<std::unique_ptr<InputBox>> inputBoxes;
-    std::vector<sf::Text> labels; // <--- НОВОЕ: Хранилище для простых надписей
+    std::vector<sf::Text> labels;
 
     std::unique_ptr<sf::Sprite> backgroundSprite;
+
+    sf::Text errorText; // <-- Текст ошибки
 
     std::function<void(GameConfig)> onStartGame;
     std::function<void()> onExit;
@@ -78,11 +80,13 @@ public:
     void setOnStartGame(std::function<void(GameConfig)> callback) { onStartGame = callback; }
     void setOnExit(std::function<void()> callback) { onExit = callback; }
 
+    // Метод для установки сообщения об ошибке
+    void setErrorMessage(const std::string& message);
+
 private:
     void initButtons();
     void createSetupButtons(sf::Vector2u winSize);
 
-    // Хелпер для создания надписей
     void createLabel(float x, float y, const std::string& text, unsigned int size = 24);
 
     std::unique_ptr<Button> createBtn(
