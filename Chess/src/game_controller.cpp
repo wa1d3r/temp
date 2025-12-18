@@ -12,6 +12,7 @@ GameController::GameController(std::unique_ptr<Board> board,
     , graphics(std::move(graphics))
     , network(std::move(network))
     , stockfish(std::move(stockfish))
+    , playerColor(controllerColor)
     , isNetworkGame(this->network != nullptr)
     , isAIGame(this->stockfish != nullptr)
     , state(ControllerState::None)
@@ -20,7 +21,7 @@ GameController::GameController(std::unique_ptr<Board> board,
     this->graphics->setOnResign([this]() { resign(); });
 
     if (controllerColor == Color::Black)
-        state == ControllerState::OpponentTurn;
+        state = ControllerState::OpponentTurn;
 
     if (isAIGame)
     {
@@ -69,19 +70,85 @@ void GameController::update()
     board->updateClock();
     graphics->drawBoard(*board, board->getCurrentPlayer());
 
-    if (isNetworkGame && state == ControllerState::OpponentTurn)
+    if (isNetworkGame && network && network->isConnected())
     {
-        if (network && network->isConnected())
+        if (network->isPeerResigned())
         {
-            // network logic
+            gameEnd(playerColor, " (opponent resign)");
+            return;
+        }
+
+        Move receivedMove = network->receiveMove();
+
+        if (receivedMove.isValid())
+        {
+            if (state == ControllerState::OpponentTurn)
+            {
+                std::vector<Move> legalMoves = board->getSelectableMoves(receivedMove.getFrom());
+                bool moveFound = false;
+
+                for (const auto& m : legalMoves)
+                {
+                    if (m == receivedMove)
+                    {
+                        if (m.isPromotion())
+                        {
+                            if (m.getPromotionPiece() == receivedMove.getPromotionPiece())
+                            {
+                                board->makeMove(m);
+                                moveFound = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            board->makeMove(m);
+                            moveFound = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (moveFound)
+                {
+                    graphics->clearHighlights();
+                    graphics->setCellTypeHl(receivedMove.getFrom(), Highlight::LAST_POS);
+                    graphics->setCellTypeHl(receivedMove.getTo(), Highlight::CURRENT_POS);
+
+                    state = ControllerState::None;
+
+                    GameStatus gst = board->getGameStatus();
+                    if (gst == GameStatus::END_GAME)
+                    {
+                        gameEnd();
+                    }
+                    else if (gst == GameStatus::CHECK)
+                    {
+                        Position kingPos = board->findPiece("king", board->getCurrentPlayer());
+                        graphics->setCellTypeHl(kingPos, Highlight::CHECK_POS);
+                    }
+                }
+                else
+                {
+                    std::cerr << "Error: Illegal move received from network" << std::endl;
+                }
+            }
+            else
+            {
+                std::cerr << "Warning: Received move during my turn!" << std::endl;
+            }
+        }
+
+        if (network->isPeerResigned())
+        {
+            gameEnd(playerColor, " (opponent resign)");
+            return;
         }
     }
 
-    // Проверка завершения потока ИИ
     if (isAIGame && !aiThinking && aiThread.joinable())
     {
-        aiThread.join(); // Завершаем поток и забираем результат
-
+        aiThread.join();
         if (!aiBestMoveStr.empty())
         {
             Move m = stringToMove(aiBestMoveStr);
@@ -95,9 +162,7 @@ void GameController::update()
 
                     GameStatus gst = board->getGameStatus();
                     if (gst == GameStatus::END_GAME)
-                    {
                         gameEnd();
-                    }
                     else if (gst == GameStatus::CHECK)
                     {
                         Position kingPos = board->findPiece("king", board->getCurrentPlayer());
@@ -106,21 +171,16 @@ void GameController::update()
                 }
             }
         }
-
         aiBestMoveStr = "";
         state = ControllerState::None;
     }
 
-    // Логика запуска потока ИИ
     if (isAIGame && !aiThinking && state == ControllerState::OpponentTurn)
     {
         state = ControllerState::OpponentTurn;
         aiThinking = true;
-
-        // Если поток уже был использован, его нужно присоединить перед новым запуском
         if (aiThread.joinable())
             aiThread.join();
-
         aiThread = std::thread(&GameController::aiThreadFunc, this);
     }
 }
@@ -133,7 +193,7 @@ void GameController::aiThreadFunc()
         std::cout << fen << std::endl;
         std::string move = stockfish->getBestMove(fen);
         std::cout << move << std::endl
-                  << std::endl;
+            << std::endl;
         aiBestMoveStr = move;
     }
     // Сигнал о завершении
@@ -233,33 +293,38 @@ void GameController::onClick(int x, int y)
                 state = ControllerState::PromotionWait;
                 Move promotionMove = *hlMove;
                 graphics->showPromotionSelector(board->getCurrentPlayer(), [this, promotionMove](std::string pieceType) {
-                        Move m(promotionMove.getFrom(), promotionMove.getTo(),
-                            promotionMove.isCastling(), true, promotionMove.isCapture(), pieceType);
+                    Move m(promotionMove.getFrom(), promotionMove.getTo(),
+                        promotionMove.isCastling(), true, promotionMove.isCapture(), pieceType);
 
-                        if (board->makeMove(m))
+                    if (board->makeMove(m))
+                    {
+                        state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
+                        selectedPos = std::nullopt;
+                        graphics->setCellTypeHl(promotionMove.getFrom(), Highlight::LAST_POS);
+                        graphics->setCellTypeHl(promotionMove.getTo(), Highlight::CURRENT_POS);
+                        graphics->hidePromotionSelector();
+                        GameStatus gst = board->getGameStatus();
+                        if (gst == GameStatus::END_GAME)
                         {
-                            state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
-                            selectedPos = std::nullopt;
-                            graphics->setCellTypeHl(promotionMove.getFrom(), Highlight::LAST_POS);
-                            graphics->setCellTypeHl(promotionMove.getTo(), Highlight::CURRENT_POS);
-                            graphics->hidePromotionSelector();
-                            GameStatus gst = board->getGameStatus();
-                            if (gst == GameStatus::END_GAME)
-                            {
-                                gameEnd();
-                            }
-                            else if (gst == GameStatus::CHECK)
-                            {
-                                board->findPiece("king", board->getCurrentPlayer());
-                                graphics->setCellTypeHl(m.getTo(), Highlight::CHECK_POS);
-                            }
-                        } }, board->getPromotionTypes());
-                return;
+                            gameEnd();
+                        }
+                        else if (gst == GameStatus::CHECK)
+                        {
+                            board->findPiece("king", board->getCurrentPlayer());
+                            graphics->setCellTypeHl(m.getTo(), Highlight::CHECK_POS);
+                        }
+                    } }, board->getPromotionTypes());
+                    return;
             }
             else
             {
                 if (board->makeMove(*hlMove))
                 {
+                    // Добавление логики работы с сервером
+                    if (isNetworkGame && network)
+                    {
+                        network->sendMove(*hlMove);
+                    }
                     state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
                     selectedPos = std::nullopt;
                     graphics->setCellTypeHl(hlMove->getFrom(), Highlight::LAST_POS);
@@ -300,7 +365,16 @@ void GameController::resign()
     if (board->getGameStatus() == GameStatus::END_GAME)
         return;
 
+    if (isNetworkGame && network)
+    {
+        network->sendGameOver();
+    }
+
     Color winner = (board->getCurrentPlayer() == Color::White) ? Color::Black : Color::White;
+
+    if (isNetworkGame)
+        winner = (playerColor == Color::White) ? Color::Black : Color::White;
+
     gameEnd(winner, " (opponent resign)");
 }
 

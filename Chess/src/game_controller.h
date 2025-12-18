@@ -40,6 +40,9 @@ private:
     std::atomic<bool> aiThinking;
     std::string aiBestMoveStr;
 
+    // Храним цвет, за который играем
+    Color playerColor;
+
     void aiThreadFunc();
 
 public:

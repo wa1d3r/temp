@@ -37,7 +37,9 @@ public:
     virtual void sendMove(const Move& move) = 0;
     virtual Move receiveMove() = 0;
     virtual bool isConnected() = 0;
-    virtual void waitForOpponentMove() = 0;
+
+    virtual void sendGameOver() = 0;
+    virtual bool isPeerResigned() = 0;
 
     virtual ~INetworkInterface() = default;
 };
