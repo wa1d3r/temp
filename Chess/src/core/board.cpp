@@ -6,6 +6,7 @@ Board::Board(std::unique_ptr<GameMode> game_mode, float startTimeSeconds, float 
 {
     this->game_mode->initializeBoard(grid);
     clock = std::make_unique<Clock>(startTimeSeconds, inc, true);
+    position_history.push_back(getFenBoardPart());
 }
 
 bool Board::makeMove(const Move& move)
@@ -15,9 +16,6 @@ bool Board::makeMove(const Move& move)
         return false;
     }
 
-    Position from = move.getFrom();
-    Position to = move.getTo();
-
     if (history.empty())
         clock->start();
     history.push_back(move);
@@ -25,6 +23,8 @@ bool Board::makeMove(const Move& move)
     game_mode->move(grid, move, current_player);
 
     switchPlayer();
+
+    position_history.push_back(getFenBoardPart());
 
     return true;
 }
@@ -53,7 +53,6 @@ bool Board::isValidMove(const Move& move) const
     }
 
     Position from = move.getFrom();
-    Position to = move.getTo();
 
     if (!grid[from.getY()][from.getX()])
     {
@@ -82,10 +81,12 @@ void Board::switchPlayer()
 GameStatus Board::getGameStatus() const
 {
     return (game_mode->isCheckmate(grid, current_player, getLastMove())
-        || game_mode->isStalemate(grid, current_player, getLastMove())
-        || clock->isTimeUp())
+               || game_mode->isStalemate(grid, current_player, getLastMove())
+               || clock->isTimeUp()
+               || isThreefoldRepetition())
         ? GameStatus::END_GAME
-        : game_mode->isInCheck(grid, current_player, getLastMove()) ? GameStatus::CHECK : GameStatus::IN_GAME;
+        : game_mode->isInCheck(grid, current_player, getLastMove()) ? GameStatus::CHECK
+                                                                    : GameStatus::IN_GAME;
 }
 
 std::optional<Color> Board::getWinner() const
@@ -95,7 +96,19 @@ std::optional<Color> Board::getWinner() const
         return std::nullopt;
     }
 
-    return (current_player == Color::White) ? Color::Black : Color::White;
+    if (clock->isTimeUp())
+    {
+        if (clock->getWhiteTime() <= 0)
+            return Color::Black;
+        return Color::White;
+    }
+
+    if (game_mode->isCheckmate(grid, current_player, getLastMove()))
+    {
+        return (current_player == Color::White) ? Color::Black : Color::White;
+    }
+
+    return std::nullopt;
 }
 
 std::vector<Move> Board::getCurrentPlayerMoves() const
@@ -166,7 +179,7 @@ const Piece::board_type& Board::getGrid() const
     return grid;
 }
 
-std::string Board::getFen() const
+std::string Board::getFenBoardPart() const
 {
     std::stringstream ss;
 
@@ -263,9 +276,33 @@ std::string Board::getFen() const
     }
     ss << enPassant;
 
+    return ss.str();
+}
+
+std::string Board::getFen() const
+{
+    std::stringstream ss;
+    ss << getFenBoardPart();
     ss << " 0 " << (history.size() / 2 + 1);
 
     return ss.str();
+}
+
+bool Board::isThreefoldRepetition() const
+{
+    if (position_history.empty())
+        return false;
+
+    std::string currentPos = position_history.back();
+    int count = 0;
+    for (const auto& pos : position_history)
+    {
+        if (pos == currentPos)
+        {
+            count++;
+        }
+    }
+    return count >= 3;
 }
 
 std::ostream& operator<<(std::ostream& os, const Board& board)

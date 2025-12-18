@@ -25,4 +25,5 @@ public:
     bool isConnected() override;
     void sendGameOver() override;
     bool isPeerResigned() override;
+    void disconnect();
 };

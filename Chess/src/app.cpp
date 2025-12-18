@@ -7,8 +7,10 @@
 #include "network/NetworkClient.h"
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <atomic>
 #include <iostream>
 #include <memory>
+#include <thread>
 
 int main()
 {
@@ -40,121 +42,144 @@ int main()
     }
 
     AppState appState = AppState::Menu;
-
     MainMenu mainMenu(window, resourceManager);
 
     std::unique_ptr<GameController> gameController = nullptr;
     std::shared_ptr<SFMLGraphics> graphics = nullptr;
 
+    std::unique_ptr<NetworkClient> netClient = nullptr;
+    std::thread connectionThread;
+    std::atomic<bool> isConnecting{ false };
+    std::atomic<bool> connectionSuccess{ false };
+
+    GameConfig tempConfig;
+    Color finalColor = Color::White;
+    int finalTime = 10;
+    int finalInc = 0;
+    int finalSeed = 0;
+
     mainMenu.setOnExit([&window]() {
         window.close();
     });
 
-    mainMenu.setOnStartGame([&](GameConfig config) {
-        graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
+    mainMenu.setOnCancelConnect([&]() {
+        if (netClient)
+        {
+            netClient->disconnect();
+        }
+        mainMenu.showGameSetup();
+    });
 
-        std::unique_ptr<INetworkInterface> network = nullptr;
-        std::unique_ptr<Stockfish> stockfish = nullptr;
+    mainMenu.setOnStartGame([&](GameConfig config) {
+        tempConfig = config;
 
         if (config.opponentType == OpponentType::Network)
         {
-            auto netClient = std::make_unique<NetworkClient>();
+            // Переключаем интерфейс в режим ожидания
+            mainMenu.showConnectionWait();
 
-            std::string ip = config.serverIp;
-            if (ip.empty())
-                ip = "127.0.0.1";
-            else
-            {
-                ip.erase(std::remove(ip.begin(), ip.end(), ' '), ip.end());
-                ip.erase(std::remove(ip.begin(), ip.end(), '\r'), ip.end());
-            }
+            // Сбрасываем старый клиент, если был
+            netClient = std::make_unique<NetworkClient>();
+            isConnecting = true;
+            connectionSuccess = false;
 
-            std::cout << "Connecting to [" << ip << "]..." << std::endl;
+            // Если поток был запущен ранее, убеждаемся, что он завершен
+            if (connectionThread.joinable())
+                connectionThread.join();
 
-            if (netClient->connect(ip, 53000))
-            {
-                std::cout << "Connected. Sending game config..." << std::endl;
-                config.seed = static_cast<int>(time(nullptr));
-
-                netClient->sendGameConfig(
-                    config.playerColor,
-                    config.timeMinutes,
-                    config.incrementSeconds,
-                    static_cast<int>(config.gameType),
-                    config.seed);
-
-                std::cout << "Waiting for second player..." << std::endl;
-
-                Color finalColor = Color::White;
-                int finalTime = 10;
-                int finalInc = 0;
-                int finalGameTypeInt = 0;
-                int finalSeed = 0;
-
-                if (netClient->waitForStart(finalColor, finalTime, finalInc, finalGameTypeInt, finalSeed))
+            // Запускаем подключение в отдельном потоке
+            connectionThread = std::thread([&, config]() {
+                std::string ip = config.serverIp;
+                if (ip.empty())
+                    ip = "127.0.0.1";
+                else
                 {
-                    GameType finalGameType = static_cast<GameType>(finalGameTypeInt);
+                    ip.erase(std::remove(ip.begin(), ip.end(), ' '), ip.end());
+                    ip.erase(std::remove(ip.begin(), ip.end(), '\r'), ip.end());
+                }
 
-                    if (finalGameType != config.gameType)
+                std::cout << "Connecting to [" << ip << "]..." << std::endl;
+
+                if (netClient->connect(ip, 53000))
+                {
+                    std::cout << "Connected. Sending game config..." << std::endl;
+                    netClient->sendGameConfig(
+                        config.playerColor,
+                        config.timeMinutes,
+                        config.incrementSeconds,
+                        static_cast<int>(config.gameType),
+                        config.seed);
+
+                    std::cout << "Waiting for second player..." << std::endl;
+
+                    int finalGameTypeInt = 0;
+                    if (netClient->waitForStart(finalColor, finalTime, finalInc, finalGameTypeInt, finalSeed))
                     {
-                        std::cout << "Error: Game mode mismatch!" << std::endl;
-                        mainMenu.setErrorMessage("Game mode mismatch!");
-                        return;
+                        GameType finalGameType = static_cast<GameType>(finalGameTypeInt);
+                        if (finalGameType != config.gameType)
+                        {
+                            std::cout << "Error: Game mode mismatch!" << std::endl;
+                            connectionSuccess = false;
+                        }
+                        else
+                        {
+                            connectionSuccess = true;
+                        }
                     }
-
-                    config.playerColor = finalColor;
-                    config.timeMinutes = finalTime;
-                    config.incrementSeconds = finalInc;
-                    config.seed = finalSeed;
-
-                    network = std::move(netClient);
-                    graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
+                    else
+                    {
+                        std::cout << "Connection wait interrupted." << std::endl;
+                        connectionSuccess = false;
+                    }
                 }
                 else
                 {
-                    std::cout << "Connection failed or server disconnected." << std::endl;
-                    mainMenu.setErrorMessage("Server disconnected");
-                    return;
+                    std::cout << "Failed to connect." << std::endl;
+                    connectionSuccess = false;
                 }
-            }
-            else
-            {
-                std::cout << "Failed to connect." << std::endl;
-                mainMenu.setErrorMessage("Connection failed");
-                return;
-            }
-        }
-        else if (config.opponentType == OpponentType::AI)
-        {
-            stockfish = std::make_unique<Stockfish>("stockfish.exe");
-        }
 
-        std::unique_ptr<GameMode> gameMode;
-        if (config.gameType == GameType::Classic)
-            gameMode = std::make_unique<Сlassic>();
+                isConnecting = false;
+            });
+        }
         else
-            gameMode = std::make_unique<Fischer>(config.seed);
+        {
+            graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
 
-        auto board = std::make_unique<Board>(std::move(gameMode), config.timeMinutes * 60, config.incrementSeconds);
+            std::unique_ptr<INetworkInterface> network = nullptr;
+            std::unique_ptr<Stockfish> stockfish = nullptr;
 
-        gameController = std::make_unique<GameController>(
-            std::move(board),
-            graphics,
-            std::move(network),
-            std::move(stockfish),
-            config.playerColor);
+            if (config.opponentType == OpponentType::AI)
+            {
+                stockfish = std::make_unique<Stockfish>("stockfish.exe");
+            }
 
-        gameController->setOnGameEnd(
-            [&appState]() {
-                appState = AppState::EndGame;
+            std::unique_ptr<GameMode> gameMode;
+            if (config.gameType == GameType::Classic)
+                gameMode = std::make_unique<Сlassic>();
+            else
+                gameMode = std::make_unique<Fischer>(config.seed);
+
+            auto board = std::make_unique<Board>(std::move(gameMode), config.timeMinutes * 60, config.incrementSeconds);
+
+            gameController = std::make_unique<GameController>(
+                std::move(board),
+                graphics,
+                std::move(network),
+                std::move(stockfish),
+                config.playerColor);
+
+            gameController->setOnGameEnd(
+                [&appState]() {
+                    appState = AppState::EndGame;
+                });
+
+            graphics->setOnClickCallback([&](Position pos) {
+                if (gameController)
+                    gameController->onClick(pos.getX(), pos.getY());
             });
 
-        graphics->setOnClickCallback([&](Position pos) {
-            if (gameController)
-                gameController->onClick(pos.getX(), pos.getY());
-        });
-
-        appState = AppState::Game;
+            appState = AppState::Game;
+        }
     });
 
     while (window.isOpen())
@@ -190,12 +215,67 @@ int main()
             }
         }
 
+        // Логика завершения подключения
+        if (appState == AppState::Menu && !isConnecting && connectionThread.joinable())
+        {
+            connectionThread.join();
+
+            if (connectionSuccess)
+            {
+                // Успешное подключение: инициализируем игру
+                tempConfig.playerColor = finalColor;
+                tempConfig.timeMinutes = finalTime;
+                tempConfig.incrementSeconds = finalInc;
+                tempConfig.seed = finalSeed;
+
+                graphics = std::make_shared<SFMLGraphics>(window, resourceManager, tempConfig.playerColor);
+
+                std::unique_ptr<GameMode> gameMode;
+                if (tempConfig.gameType == GameType::Classic)
+                    gameMode = std::make_unique<Сlassic>();
+                else
+                    gameMode = std::make_unique<Fischer>(tempConfig.seed);
+
+                auto board = std::make_unique<Board>(std::move(gameMode), tempConfig.timeMinutes * 60, tempConfig.incrementSeconds);
+
+                gameController = std::make_unique<GameController>(
+                    std::move(board),
+                    graphics,
+                    std::move(netClient),
+                    nullptr,
+                    tempConfig.playerColor);
+
+                gameController->setOnGameEnd(
+                    [&appState]() {
+                        appState = AppState::EndGame;
+                    });
+
+                graphics->setOnClickCallback([&](Position pos) {
+                    if (gameController)
+                        gameController->onClick(pos.getX(), pos.getY());
+                });
+
+                appState = AppState::Game;
+            }
+            else
+            {
+                // Ошибка или отмена подключения
+                if (mainMenu.getCurrentScreen() == MenuScreen::Connecting)
+                {
+                    mainMenu.setErrorMessage("Connection failed or lost");
+                    mainMenu.showGameSetup();
+                }
+            }
+        }
+
         if (appState == AppState::EndGame)
         {
             appState = AppState::Menu;
             gameController.reset();
             graphics.reset();
             mainMenu.resize();
+
+            mainMenu.showGameSetup();
         }
 
         window.clear();
@@ -215,6 +295,13 @@ int main()
         }
 
         window.display();
+    }
+
+    if (connectionThread.joinable())
+    {
+        if (netClient)
+            netClient->disconnect();
+        connectionThread.join();
     }
 
     return 0;

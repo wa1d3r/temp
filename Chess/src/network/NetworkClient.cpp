@@ -174,3 +174,9 @@ bool NetworkClient::isPeerResigned()
     }
     return false;
 }
+
+void NetworkClient::disconnect()
+{
+    connected = false;
+    socket.disconnect();
+}

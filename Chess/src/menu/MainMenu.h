@@ -44,7 +44,8 @@ enum class MenuScreen
 {
     Main,
     GameSetup,
-    About
+    About,
+    Connecting
 };
 
 enum class AnimType
@@ -79,10 +80,10 @@ class MainMenu
 
     std::function<void(GameConfig)> onStartGame;
     std::function<void()> onExit;
+    std::function<void()> onCancelConnect;
 
     // --- Анимация ---
     sf::Clock dtClock;
-    float idleTimer;          // Время простоя для запуска анимации
     AnimType currentAnim;     // Текущая активная анимация
 
     sf::Sprite animSprite1;
@@ -100,8 +101,14 @@ public:
     void draw();
     void resize();
 
+    void setOnCancelConnect(std::function<void()> callback) { onCancelConnect = callback; }
     void setOnStartGame(std::function<void(GameConfig)> callback) { onStartGame = callback; }
     void setOnExit(std::function<void()> callback) { onExit = callback; }
+
+    void showConnectionWait();
+    void showGameSetup();
+
+    MenuScreen getCurrentScreen() const { return currentScreen; }
 
     void setErrorMessage(const std::string& message);
 

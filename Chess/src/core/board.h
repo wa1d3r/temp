@@ -4,6 +4,7 @@
 #include "move.h"
 #include "pieces.h"
 #include <iostream>
+#include <map>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -21,6 +22,7 @@ class Board
     std::vector<std::vector<std::unique_ptr<Piece>>> grid;
     std::unique_ptr<GameMode> game_mode;
     std::vector<Move> history;
+    std::vector<std::string> position_history;
     Color current_player;
     std::unique_ptr<Clock> clock;
 
@@ -46,6 +48,9 @@ public:
     bool isTimeUp() const;
     void timeStop();
     std::string getFen() const;
+
+    bool isThreefoldRepetition() const;
+    std::string getFenBoardPart() const;
 
     friend std::ostream& operator<<(std::ostream& os, const Board& board);
 };
