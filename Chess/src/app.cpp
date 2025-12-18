@@ -1,10 +1,10 @@
-#include "core/Stockfish.h"
+﻿#include "core/Stockfish.h"
 #include "core/board.h"
-#include "network/NetworkClient.h"
 #include "game_controller.h"
 #include "graphic/ResourceManager.h"
 #include "graphic/sfml_graphics.h"
 #include "menu/MainMenu.h"
+#include "network/NetworkClient.h"
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <memory>
@@ -50,14 +50,6 @@ int main()
     });
 
     mainMenu.setOnStartGame([&](GameConfig config) {
-        std::unique_ptr<GameMode> gameMode;
-        if (config.gameType == GameType::Classic)
-            gameMode = std::make_unique<Test>();
-        else
-            gameMode = std::make_unique<Fischer>();
-
-        auto board = std::make_unique<Board>(std::move(gameMode), config.timeMinutes * 60, config.incrementSeconds);
-
         graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
 
         std::unique_ptr<INetworkInterface> network = nullptr;
@@ -88,22 +80,54 @@ int main()
             if (netClient->connect(ip, 53000))
             {
                 std::cout << "Connected. Sending game config..." << std::endl;
-                netClient->sendGameConfig(config.playerColor, config.timeMinutes, config.incrementSeconds);
+
+                // Генерируем seed для Хоста (если мы хост, это пригодится, если гость - сервер перезапишет)
+                // Но лучше генерировать только если мы инициатор.
+                // В текущей логике оба отправляют конфиг, но сервер слушает только первого.
+                config.seed = static_cast<int>(time(nullptr));
+
+                // Отправляем конфиг с типом игры и сидом
+                netClient->sendGameConfig(
+                    config.playerColor,
+                    config.timeMinutes,
+                    config.incrementSeconds,
+                    static_cast<int>(config.gameType),
+                    config.seed);
 
                 std::cout << "Waiting for second player..." << std::endl;
 
                 Color finalColor = Color::White;
                 int finalTime = 10;
                 int finalInc = 0;
+                int finalGameTypeInt = 0;
+                int finalSeed = 0;
 
-                if (netClient->waitForStart(finalColor, finalTime, finalInc))
+                // Ждем старта и получения настроек от сервера (которые задал Хост)
+                if (netClient->waitForStart(finalColor, finalTime, finalInc, finalGameTypeInt, finalSeed))
                 {
-                    // ��������� ���������, ���������� �� �������
+                    GameType finalGameType = static_cast<GameType>(finalGameTypeInt);
+
+                    // ПРОВЕРКА: Совпадают ли режимы игры?
+                    if (finalGameType != config.gameType)
+                    {
+                        std::cout << "Error: Game mode mismatch! Host plays "
+                                  << (finalGameType == GameType::Classic ? "Classic" : "Fischer")
+                                  << ", you selected "
+                                  << (config.gameType == GameType::Classic ? "Classic" : "Fischer")
+                                  << "." << std::endl;
+
+                        // Разрываем соединение и не начинаем игру
+                        return;
+                    }
+
+                    // Применяем настройки
                     config.playerColor = finalColor;
                     config.timeMinutes = finalTime;
                     config.incrementSeconds = finalInc;
+                    config.seed = finalSeed; // Применяем seed от сервера
 
-                    std::cout << "Final Config: " << finalTime << " min + " << finalInc << " sec." << std::endl;
+                    std::cout << "Final Config: Mode=" << finalGameTypeInt
+                              << ", Seed=" << finalSeed << std::endl;
 
                     network = std::move(netClient);
                     graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
@@ -124,6 +148,14 @@ int main()
         {
             stockfish = std::make_unique<Stockfish>("stockfish.exe");
         }
+
+        std::unique_ptr<GameMode> gameMode;
+        if (config.gameType == GameType::Classic)
+            gameMode = std::make_unique<Test>();
+        else
+            gameMode = std::make_unique<Fischer>(config.seed);
+
+        auto board = std::make_unique<Board>(std::move(gameMode), config.timeMinutes * 60, config.incrementSeconds);
 
         gameController = std::make_unique<GameController>(
             std::move(board),

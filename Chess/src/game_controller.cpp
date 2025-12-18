@@ -115,12 +115,12 @@ void GameController::update()
                     graphics->setCellTypeHl(receivedMove.getFrom(), Highlight::LAST_POS);
                     graphics->setCellTypeHl(receivedMove.getTo(), Highlight::CURRENT_POS);
 
-                    state = ControllerState::None;
+                    state = ControllerState::None; 
 
                     GameStatus gst = board->getGameStatus();
                     if (gst == GameStatus::END_GAME)
                     {
-                        gameEnd();
+                        gameEnd(); 
                     }
                     else if (gst == GameStatus::CHECK)
                     {
@@ -193,7 +193,7 @@ void GameController::aiThreadFunc()
         std::cout << fen << std::endl;
         std::string move = stockfish->getBestMove(fen);
         std::cout << move << std::endl
-            << std::endl;
+                  << std::endl;
         aiBestMoveStr = move;
     }
     // Сигнал о завершении
@@ -293,35 +293,35 @@ void GameController::onClick(int x, int y)
                 state = ControllerState::PromotionWait;
                 Move promotionMove = *hlMove;
                 graphics->showPromotionSelector(board->getCurrentPlayer(), [this, promotionMove](std::string pieceType) {
-                    Move m(promotionMove.getFrom(), promotionMove.getTo(),
-                        promotionMove.isCastling(), true, promotionMove.isCapture(), pieceType);
+                        Move m(promotionMove.getFrom(), promotionMove.getTo(),
+                            promotionMove.isCastling(), true, promotionMove.isCapture(), pieceType);
 
-                    if (board->makeMove(m))
-                    {
-                        state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
-                        selectedPos = std::nullopt;
-                        graphics->setCellTypeHl(promotionMove.getFrom(), Highlight::LAST_POS);
-                        graphics->setCellTypeHl(promotionMove.getTo(), Highlight::CURRENT_POS);
-                        graphics->hidePromotionSelector();
-                        GameStatus gst = board->getGameStatus();
-                        if (gst == GameStatus::END_GAME)
+                        if (board->makeMove(m))
                         {
-                            gameEnd();
-                        }
-                        else if (gst == GameStatus::CHECK)
-                        {
-                            board->findPiece("king", board->getCurrentPlayer());
-                            graphics->setCellTypeHl(m.getTo(), Highlight::CHECK_POS);
-                        }
-                    } }, board->getPromotionTypes());
-                    return;
+                            state = (isAIGame || isNetworkGame) ? ControllerState::OpponentTurn : ControllerState::None;
+                            selectedPos = std::nullopt;
+                            graphics->setCellTypeHl(promotionMove.getFrom(), Highlight::LAST_POS);
+                            graphics->setCellTypeHl(promotionMove.getTo(), Highlight::CURRENT_POS);
+                            graphics->hidePromotionSelector();
+                            GameStatus gst = board->getGameStatus();
+                            if (gst == GameStatus::END_GAME)
+                            {
+                                gameEnd();
+                            }
+                            else if (gst == GameStatus::CHECK)
+                            {
+                                board->findPiece("king", board->getCurrentPlayer());
+                                graphics->setCellTypeHl(m.getTo(), Highlight::CHECK_POS);
+                            }
+                        } }, board->getPromotionTypes());
+                return;
             }
             else
             {
                 if (board->makeMove(*hlMove))
                 {
                     // Добавление логики работы с сервером
-                    if (isNetworkGame && network)
+                    if(isNetworkGame && network)
                     {
                         network->sendMove(*hlMove);
                     }
