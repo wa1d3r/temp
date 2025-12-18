@@ -7,6 +7,7 @@
 #include "network/NetworkClient.h"
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <iostream>
 #include <memory>
 
 int main()
@@ -16,6 +17,7 @@ int main()
 
     ResourceManager resourceManager;
 
+    // ... (Загрузка текстур и шрифтов осталась без изменений) ...
     resourceManager.loadFont("main_font", "assets/fonts/MoonlitFlow-Regular.otf");
     resourceManager.loadTexture("cell_white", "assets/textures/white_cell.png");
     resourceManager.loadTexture("cell_black", "assets/textures/black_cell.png");
@@ -59,14 +61,8 @@ int main()
         {
             auto netClient = std::make_unique<NetworkClient>();
 
-            std::string ip;
-            std::cout << "Enter Server IP (default 127.0.0.1): ";
-
-            if (std::cin.peek() == '\n')
-                std::cin.ignore();
-
-            std::getline(std::cin, ip);
-
+            // Получаем IP из конфига
+            std::string ip = config.serverIp;
             if (ip.empty())
                 ip = "127.0.0.1";
             else
@@ -80,13 +76,8 @@ int main()
             if (netClient->connect(ip, 53000))
             {
                 std::cout << "Connected. Sending game config..." << std::endl;
-
-                // Генерируем seed для Хоста (если мы хост, это пригодится, если гость - сервер перезапишет)
-                // Но лучше генерировать только если мы инициатор.
-                // В текущей логике оба отправляют конфиг, но сервер слушает только первого.
                 config.seed = static_cast<int>(time(nullptr));
 
-                // Отправляем конфиг с типом игры и сидом
                 netClient->sendGameConfig(
                     config.playerColor,
                     config.timeMinutes,
@@ -102,45 +93,40 @@ int main()
                 int finalGameTypeInt = 0;
                 int finalSeed = 0;
 
-                // Ждем старта и получения настроек от сервера (которые задал Хост)
+                // Ожидание ответа сервера
                 if (netClient->waitForStart(finalColor, finalTime, finalInc, finalGameTypeInt, finalSeed))
                 {
                     GameType finalGameType = static_cast<GameType>(finalGameTypeInt);
 
-                    // ПРОВЕРКА: Совпадают ли режимы игры?
                     if (finalGameType != config.gameType)
                     {
-                        std::cout << "Error: Game mode mismatch! Host plays "
-                                  << (finalGameType == GameType::Classic ? "Classic" : "Fischer")
-                                  << ", you selected "
-                                  << (config.gameType == GameType::Classic ? "Classic" : "Fischer")
-                                  << "." << std::endl;
-
-                        // Разрываем соединение и не начинаем игру
+                        std::cout << "Error: Game mode mismatch!" << std::endl;
+                        // Ошибка на английском
+                        mainMenu.setErrorMessage("Game mode mismatch!");
                         return;
                     }
 
-                    // Применяем настройки
                     config.playerColor = finalColor;
                     config.timeMinutes = finalTime;
                     config.incrementSeconds = finalInc;
-                    config.seed = finalSeed; // Применяем seed от сервера
-
-                    std::cout << "Final Config: Mode=" << finalGameTypeInt
-                              << ", Seed=" << finalSeed << std::endl;
+                    config.seed = finalSeed;
 
                     network = std::move(netClient);
                     graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
                 }
                 else
                 {
+                    // Сообщение: сервер разорвал соединение
                     std::cout << "Connection failed or server disconnected." << std::endl;
+                    mainMenu.setErrorMessage("Server disconnected");
                     return;
                 }
             }
             else
             {
+                // Сообщение: не удается подключиться
                 std::cout << "Failed to connect." << std::endl;
+                mainMenu.setErrorMessage("Connection failed");
                 return;
             }
         }
@@ -149,6 +135,7 @@ int main()
             stockfish = std::make_unique<Stockfish>("stockfish.exe");
         }
 
+        // ... (Создание игры и контроллера осталось без изменений) ...
         std::unique_ptr<GameMode> gameMode;
         if (config.gameType == GameType::Classic)
             gameMode = std::make_unique<Test>();
