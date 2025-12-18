@@ -456,26 +456,26 @@ public:
         promotionButtons.clear();
 
         sf::Vector2u winSize = window.getSize();
-        float minSide = std::min(static_cast<float>(winSize.x), static_cast<float>(winSize.y));
-        float margin = minSide * 0.05f;
-        float boardSide = minSide - 2.0f * margin;
-        float cellSize = (minSide * 0.9f) / 8.0f;
 
-        float startX = margin + 2 * cellSize;
-        float startY = margin + 4 * cellSize;
+        float startX = boardArea.position.x;
+        float startY = boardArea.position.y;
+        float boardSize = boardArea.size.x;
+        float cellSize = boardSize / 8.0f;
 
         std::string suffix = (color == Color::White) ? "_white" : "_black";
 
-        promotionBgShape.setSize(sf::Vector2f(8.0f * cellSize, 8.0f * cellSize));
-        promotionBgShape.setPosition(sf::Vector2f(margin, margin));
-
+        promotionBgShape.setSize(sf::Vector2f(boardSize, boardSize));
+        promotionBgShape.setPosition(sf::Vector2f(startX, startY));
         promotionBgShape.setFillColor(sf::Color(50, 50, 50, 200));
+
+        float buttonsStartX = startX + 2.0f * cellSize;
+        float buttonsStartY = startY + 3.5f * cellSize;
 
         int i = 0;
         for (const auto& type : promotionTypes)
         {
-            float btnX = startX + (i++ * cellSize);
-            sf::Vector2f relPos(btnX / winSize.x, startY / winSize.y);
+            float btnX = buttonsStartX + (i++ * cellSize);
+            sf::Vector2f relPos(btnX / winSize.x, buttonsStartY / winSize.y);
             sf::Vector2f relSize(cellSize / winSize.x, cellSize / winSize.y);
 
             auto btn = std::make_unique<Button>(
