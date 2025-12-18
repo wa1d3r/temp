@@ -17,7 +17,8 @@ public:
 
     bool connect(const std::string& ip, unsigned short port);
 
-    bool waitForStart(Color& assignedColor);
+    void sendGameConfig(Color color, int timeMinutes, int incrementSeconds);
+    bool waitForStart(Color& assignedColor, int& timeMinutes, int& incrementSeconds);
 
     void sendMove(const Move& move) override;
     Move receiveMove() override;

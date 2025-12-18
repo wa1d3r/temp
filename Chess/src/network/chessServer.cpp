@@ -67,20 +67,30 @@ void ChessServer::handleNewConnection()
 
 void ChessServer::startGame()
 {
-    std::cout << "Match started! Assigning colors..." << std::endl;
+    std::cout << "Match started! Applying host settings..." << std::endl;
+    std::cout << "Settings: Host=" << (hostColorInt == 0 ? "White" : "Black")
+              << ", Time=" << timeMinutes << "+" << incrementSeconds << std::endl;
 
-    // 1. Отправляем цвета
-    // Клиент 0 -> Белые (0)
+    // 1. Формируем пакеты конфигурации
+
+    // Для Хоста (Client 0) - настройки как есть
     sf::Packet p1;
-    p1 << static_cast<int>(PacketType::SetColor) << 0;
+    p1 << static_cast<int>(PacketType::GameConfig)
+       << hostColorInt
+       << timeMinutes
+       << incrementSeconds;
     clients[0]->send(p1);
 
-    // Клиент 1 -> Черные (1)
+    // Для Гостя (Client 1) - цвет инвертирован
     sf::Packet p2;
-    p2 << static_cast<int>(PacketType::SetColor) << 1;
+    int guestColorInt = (hostColorInt == 0) ? 1 : 0; // Инверсия
+    p2 << static_cast<int>(PacketType::GameConfig)
+       << guestColorInt
+       << timeMinutes
+       << incrementSeconds;
     clients[1]->send(p2);
 
-    // 2. Отправляем сигнал начала игры
+    // 2. Отправляем сигнал старта
     sf::Packet pStart;
     pStart << static_cast<int>(PacketType::StartGame);
 
@@ -131,12 +141,9 @@ void ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
 
         if (type == PacketType::Move)
         {
-
             Move move;
             if (packet >> move)
             {
-                std::cout << "Relaying move..." << std::endl;
-
                 sf::Packet relayPacket;
                 relayPacket << static_cast<int>(PacketType::Move) << move;
                 relayPacketToOthers(sender, relayPacket);
@@ -144,10 +151,23 @@ void ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
         }
         else if (type == PacketType::GameOver)
         {
-            std::cout << "Relaying GameOver signal..." << std::endl;
             sf::Packet relayPacket;
             relayPacket << static_cast<int>(PacketType::GameOver);
             relayPacketToOthers(sender, relayPacket);
+        }
+        else if (type == PacketType::GameConfig)
+        {
+            if (clients.size() > 0 && clients[0].get() == &sender)
+            {
+                int c, t, i;
+                if (packet >> c >> t >> i)
+                {
+                    hostColorInt = c;
+                    timeMinutes = t;
+                    incrementSeconds = i;
+                    std::cout << "Host updated settings: " << t << "m+" << i << "s" << std::endl;
+                }
+            }
         }
     }
 }
