@@ -64,3 +64,27 @@ std::ostream& operator<<(std::ostream& os, const Move& m)
     os << "Move{from: " << m.from.getX() << ' ' << m.from.getY() << ", to: " << m.to.getX() << ' ' << m.to.getY() << "}";
     return os;
 }
+
+sf::Packet& operator<<(sf::Packet& packet, const Move& move)
+{
+    return packet << move.getFrom()
+        << move.getTo()
+        << move.isCastling()
+        << move.isPromotion()
+        << move.isCapture()
+        << move.getPromotionPiece();
+}
+
+sf::Packet& operator>>(sf::Packet& packet, Move& move)
+{
+    Position from, to;
+    bool isCastling, isPromotion, isCapture;
+    std::string promoPiece;
+
+    if (packet >> from >> to >> isCastling >> isPromotion >> isCapture >> promoPiece)
+    {
+        move = Move(from, to, isCastling, isPromotion, isCapture, promoPiece);
+    }
+
+    return packet;
+}

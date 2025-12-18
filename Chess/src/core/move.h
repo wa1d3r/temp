@@ -1,5 +1,6 @@
 #pragma once
 #include "position.h"
+#include <SFML/Network/Packet.hpp>
 #include <iostream>
 
 class Move
@@ -13,7 +14,7 @@ class Move
 
 public:
     Move();
-    Move(Position from, Position to, bool is_castling = false, 
+    Move(Position from, Position to, bool is_castling = false,
         bool is_promotion = false, bool is_capture = false, const std::string& promotion_piece = "");
     Move(const Move&);
     Move(Move&&) noexcept;
@@ -30,3 +31,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const Move& m);
 };
+
+// Оператор для записи хода в пакет 
+sf::Packet& operator<<(sf::Packet& packet, const Move& move);
+
+// Оператор для чтения хода из пакета 
+sf::Packet& operator>>(sf::Packet& packet, Move& move);
