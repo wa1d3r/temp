@@ -1,5 +1,5 @@
 #include "NetworkClient.h"
-#include "PacketType.h" 
+#include "PacketType.h"
 #include <iostream>
 
 NetworkClient::NetworkClient()
@@ -34,13 +34,29 @@ bool NetworkClient::connect(const std::string& ip, unsigned short port)
     return false;
 }
 
-bool NetworkClient::waitForStart(Color& assignedColor)
+void NetworkClient::sendGameConfig(Color color, int timeMinutes, int incrementSeconds)
+{
+    if (!connected)
+        return;
+
+    sf::Packet packet;
+    int colorInt = (color == Color::White) ? 0 : 1;
+
+    packet << static_cast<int>(PacketType::GameConfig)
+           << colorInt
+           << timeMinutes
+           << incrementSeconds;
+
+    socket.send(packet);
+}
+
+bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& incrementSeconds)
 {
     if (!connected)
         return false;
 
-    std::cout << "Waiting for opponent (Blocking mode)..." << std::endl;
-    socket.setBlocking(true); // Включаем блокировку
+    std::cout << "Waiting for game start (Blocking mode)..." << std::endl;
+    socket.setBlocking(true);
 
     bool gameStarted = false;
 
@@ -51,7 +67,7 @@ bool NetworkClient::waitForStart(Color& assignedColor)
 
         if (status == sf::Socket::Status::Disconnected)
         {
-            std::cout << "Server disconnected during wait." << std::endl;
+            std::cout << "Server disconnected." << std::endl;
             return false;
         }
 
@@ -60,29 +76,30 @@ bool NetworkClient::waitForStart(Color& assignedColor)
             int typeInt;
             if (packet >> typeInt)
             {
-                std::cout << "[DEBUG] Received Packet Type ID: " << typeInt << std::endl;
-
                 PacketType type = static_cast<PacketType>(typeInt);
 
-                if (type == PacketType::SetColor)
+                if (type == PacketType::GameConfig)
                 {
                     int colorInt;
-                    if (packet >> colorInt)
+                    if (packet >> colorInt >> timeMinutes >> incrementSeconds)
                     {
                         assignedColor = (colorInt == 0) ? Color::White : Color::Black;
-                        std::cout << "Color assigned: " << (colorInt == 0 ? "White" : "Black") << std::endl;
+                        std::cout << "Config received: "
+                                  << (colorInt == 0 ? "White" : "Black")
+                                  << ", " << timeMinutes << "m+" << incrementSeconds << "s"
+                                  << std::endl;
                     }
                 }
                 else if (type == PacketType::StartGame)
                 {
-                    std::cout << "Game Started signal received!" << std::endl;
+                    std::cout << "Game Started!" << std::endl;
                     gameStarted = true;
                 }
             }
         }
     }
 
-    socket.setBlocking(false); // Выключаем блокировку для игры
+    socket.setBlocking(false);
     return true;
 }
 
@@ -123,8 +140,8 @@ Move NetworkClient::receiveMove()
             }
             else if (type == PacketType::GameOver)
             {
-                std::cout << "Received GameOver signal from opponent." << std::endl;
-                peerResignedFlag = true; 
+                std::cout << "Received GameOver signal." << std::endl;
+                peerResignedFlag = true;
             }
             else if (type == PacketType::Disconnect)
             {
@@ -159,7 +176,7 @@ bool NetworkClient::isPeerResigned()
 {
     if (peerResignedFlag)
     {
-        peerResignedFlag = false; 
+        peerResignedFlag = false;
         return true;
     }
     return false;
