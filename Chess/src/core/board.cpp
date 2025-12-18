@@ -170,7 +170,7 @@ std::string Board::getFen() const
 {
     std::stringstream ss;
 
-    // 1. Положение фигур
+    // 1. Положение фигур (оставляем без изменений)
     for (int y = 7; y >= 0; --y)
     {
         int emptyCount = 0;
@@ -203,38 +203,56 @@ std::string Board::getFen() const
     // 2. Активный цвет
     ss << (current_player == Color::White ? " w " : " b ");
 
-    // 3. Рокировка
+    // 3. Рокировка (ИСПРАВЛЕНИЕ)
     std::string castling = "";
 
-    // Белые
-    auto wk = grid[0][4].get(); // Король e1
-    if (wk && wk->getType() == "king" && !wk->isMoved())
-    {
-        auto wr_k = grid[0][7].get(); // Ладья h1
-        if (wr_k && wr_k->getType() == "rook" && !wr_k->isMoved())
-            castling += "K";
+    auto checkCastling = [&](int y, char kLabel, char qLabel) {
+        // Находим позицию короля
+        int kingX = -1;
+        for (int x = 0; x < 8; ++x)
+        {
+            if (grid[y][x] && grid[y][x]->getType() == "king")
+            {
+                kingX = x;
+                break;
+            }
+        }
+        // Если короля нет или он ходил — рокировки нет
+        if (kingX == -1 || grid[y][kingX]->isMoved())
+            return;
 
-        auto wr_q = grid[0][0].get(); // Ладья a1
-        if (wr_q && wr_q->getType() == "rook" && !wr_q->isMoved())
-            castling += "Q";
-    }
+        // Проверяем ладьи
+        bool kSideFound = false;
+        bool qSideFound = false;
 
-    // Черные
-    auto bk = grid[7][4].get(); // Король e8
-    if (bk && bk->getType() == "king" && !bk->isMoved())
-    {
-        auto br_k = grid[7][7].get(); // Ладья h8
-        if (br_k && br_k->getType() == "rook" && !br_k->isMoved())
-            castling += "k";
+        for (int x = 0; x < 8; ++x)
+        {
+            if (x == kingX)
+                continue;
+            auto& p = grid[y][x];
+            if (p && p->getType() == "rook" && !p->isMoved())
+            {
+                // Если ладья справа от короля — это Королевский фланг
+                if (x > kingX)
+                    kSideFound = true;
+                // Если ладья слева от короля — это Ферзевый фланг
+                else if (x < kingX)
+                    qSideFound = true;
+            }
+        }
 
-        auto br_q = grid[7][0].get(); // Ладья a8
-        if (br_q && br_q->getType() == "rook" && !br_q->isMoved())
-            castling += "q";
-    }
+        if (kSideFound)
+            castling += kLabel;
+        if (qSideFound)
+            castling += qLabel;
+    };
+
+    checkCastling(0, 'K', 'Q'); // Белые
+    checkCastling(7, 'k', 'q'); // Черные
 
     ss << (castling.empty() ? "-" : castling) << " ";
 
-    // 4. Взятие на проходе
+    // 4. Взятие на проходе (оставляем без изменений)
     auto lastMoveOpt = getLastMove();
     std::string enPassant = "-";
     if (lastMoveOpt.has_value())
@@ -242,8 +260,6 @@ std::string Board::getFen() const
         Move last = *lastMoveOpt;
         Position from = last.getFrom();
         Position to = last.getTo();
-
-        // Проверяем, был ли ход пешкой на 2 клетки
         if (grid[to.getY()][to.getX()] && grid[to.getY()][to.getX()]->getType() == "pawn")
         {
             if (abs(from.getY() - to.getY()) == 2)
@@ -256,7 +272,7 @@ std::string Board::getFen() const
     }
     ss << enPassant;
 
-    // 5. Полуходы и номер хода (упрощенно, так как Board не хранит счетчик 50 ходов)
+    // 5. Полуходы
     ss << " 0 " << (history.size() / 2 + 1);
 
     return ss.str();
