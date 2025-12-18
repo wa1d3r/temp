@@ -1,46 +1,74 @@
 #include "MainMenu.h"
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 
-// Инициализируем errorText шрифтом прямо в списке инициализации
 MainMenu::MainMenu(sf::RenderWindow& win, ResourceManager& rm)
     : window(win)
     , resourceManager(rm)
     , currentScreen(MenuScreen::Main)
-    , errorText(*rm.getFont("main_font")) // <-- Исправление ошибки конструктора
+    , errorText(*rm.getFont("main_font"))
+    , aboutText(*rm.getFont("main_font"))
+    , currentAnim(AnimType::None)
+    , idleTimer(0.0f)
+    , animSprite1(*rm.getTexture("background"))
+    , animSprite2(*rm.getTexture("background"))
+    , secondActorActive(false)
 {
     backgroundSprite = std::make_unique<sf::Sprite>(*resourceManager.getTexture("background"));
 
-    // Настраиваем стиль текста ошибки
-    errorText.setCharacterSize(30); // Чуть крупнее для заметности
+    errorText.setCharacterSize(30);
     errorText.setFillColor(sf::Color::Red);
-    // Обводка для читаемости на любом фоне
     errorText.setOutlineColor(sf::Color::Black);
     errorText.setOutlineThickness(2.0f);
 
+    aboutText.setFillColor(sf::Color::White);
+    aboutText.setOutlineColor(sf::Color::Black);
+    aboutText.setOutlineThickness(2.0f);
+    aboutText.setLineSpacing(1.2f);
+
+    std::string info = "Chess Game\n\n"
+                       "Game Modes:\n"
+                       "- Classic Chess: Standard international rules.\n"
+                       "- Fischer Chess (960): Randomized starting positions\n"
+                       "  to test your creativity and strategy.\n\n"
+                       "Features:\n"
+                       "- Local Multiplayer\n"
+                       "- Network Play\n"
+                       "- Stockfish AI Integration\n\n"
+                       "Developed using C++ and SFML library.\n\n"
+                       "Authors: wa1der, kqldbl\n";
+
+    aboutText.setString(info);
+    srand(static_cast<unsigned int>(time(0)));
     resize();
 }
 
 void MainMenu::resize()
 {
-    const sf::Texture bgTex = backgroundSprite->getTexture();
+    const sf::Texture& bgTex = backgroundSprite->getTexture();
     float scaleX = static_cast<float>(window.getSize().x) / bgTex.getSize().x;
     float scaleY = static_cast<float>(window.getSize().y) / bgTex.getSize().y;
     backgroundSprite->setScale(sf::Vector2f(scaleX, scaleY));
+
+    unsigned int charSize = static_cast<unsigned int>(window.getSize().y * 0.025f);
+    if (charSize < 16)
+        charSize = 16;
+    aboutText.setCharacterSize(charSize);
+
+    sf::FloatRect bounds = aboutText.getLocalBounds();
+    aboutText.setOrigin(bounds.getCenter());
+    aboutText.setPosition(sf::Vector2f(window.getSize().x / 2.0f, window.getSize().y / 2.0f));
+
     initButtons();
 }
 
 void MainMenu::setErrorMessage(const std::string& message)
 {
     errorText.setString(message);
-
-    // Центрируем точку привязки текста
     sf::FloatRect bounds = errorText.getLocalBounds();
     errorText.setOrigin(bounds.getCenter());
-
-    // Устанавливаем позицию: центр по ширине, 10% отступа сверху
-    // Ничего не сдвигаем, текст просто рисуется поверх
     errorText.setPosition(sf::Vector2f(window.getSize().x / 2.0f, window.getSize().y * 0.1f));
 }
 
@@ -49,8 +77,6 @@ void MainMenu::createLabel(float x, float y, const std::string& str, unsigned in
     sf::Text text(*resourceManager.getFont("main_font"), str);
     text.setCharacterSize(size);
     text.setFillColor(sf::Color(200, 200, 200));
-
-    // Позиционируем по координатам экрана
     text.setPosition(sf::Vector2f(window.getSize().x * x, window.getSize().y * y));
     labels.push_back(text);
 }
@@ -67,13 +93,11 @@ std::unique_ptr<Button> MainMenu::createBtn(sf::Vector2f pos, sf::Vector2f size,
 
 void MainMenu::initButtons()
 {
-    // Очищаем ошибку при обновлении меню (смене экрана)
     errorText.setString("");
 
     sf::Vector2u winSize = window.getSize();
     mainButtons.clear();
     setupButtons.clear();
-    aboutButtons.clear();
     backButton.clear();
     inputBoxes.clear();
     labels.clear();
@@ -83,7 +107,6 @@ void MainMenu::initButtons()
     float startY = 0.3f;
     float gap = 0.12f;
 
-    // --- MAIN SCREEN ---
     mainButtons.push_back(createBtn({ 0.35f, startY }, { btnW, btnH }, "Classic Chess", [this]() {
         currentConfig.gameType = GameType::Classic;
         currentScreen = MenuScreen::GameSetup;
@@ -101,12 +124,13 @@ void MainMenu::initButtons()
 
     mainButtons.push_back(createBtn({ 0.35f, startY + gap * 3 }, { btnW, btnH }, "About", [this]() {
         currentScreen = MenuScreen::About;
+        idleTimer = 4.0f;
+        currentAnim = AnimType::None;
     }));
 
     mainButtons.push_back(createBtn({ 0.35f, startY + gap * 4 }, { btnW, btnH }, "Exit", [this]() {
         if (onExit) onExit(); }, sf::Color(255, 150, 150)));
 
-    // --- SETUP SCREEN ---
     backButton.push_back(createBtn({ 0.05f, 0.9f }, { 0.15f, 0.06f }, "< Back", [this]() {
         currentScreen = MenuScreen::Main;
         initButtons();
@@ -116,11 +140,6 @@ void MainMenu::initButtons()
     {
         createSetupButtons(winSize);
     }
-
-    if (currentScreen == MenuScreen::About)
-    {
-        aboutButtons.push_back(createBtn({ 0.2f, 0.3f }, { 0.6f, 0.4f }, "Chess Game v1.0\nDevs: You\n\nBuilt with SFML", []() {}, sf::Color(240, 240, 240)));
-    }
 }
 
 void MainMenu::createSetupButtons(sf::Vector2u winSize)
@@ -128,7 +147,6 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     float col1 = 0.1f, col2 = 0.4f, col3 = 0.7f;
     float row = 0.15f;
 
-    // 1. OPPONENT
     setupButtons.push_back(createBtn({ col1, row }, { 0.25f, 0.08f }, "Local (2P)", [this]() {
         currentConfig.opponentType = OpponentType::Local;
         initButtons(); }, currentConfig.opponentType == OpponentType::Local ? sf::Color::Green : sf::Color::White));
@@ -143,7 +161,6 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
 
     row += 0.15f;
 
-    // 2. COLOR
     setupButtons.push_back(createBtn({ col1, row }, { 0.25f, 0.08f }, "White", [this]() {
         currentConfig.playerColor = Color::White;
         currentConfig.isRandomColor = false;
@@ -160,18 +177,14 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
 
     row += 0.15f;
 
-    // 3. TIME INPUTS
     const sf::Font* font = resourceManager.getFont("main_font");
     float customRow = row + 0.16f;
     float labelYOffset = 0.01f;
-
-    float labelW = 0.15f;
     float inputW = 0.10f;
-
     float minLabelX = 0.15f;
-    float minInputX = minLabelX + labelW;
+    float minInputX = minLabelX + 0.15f;
     float incLabelX = 0.55f;
-    float incInputX = incLabelX + labelW;
+    float incInputX = incLabelX + 0.15f;
 
     auto minInput = std::make_unique<InputBox>(
         sf::Vector2f(winSize.x * minInputX, winSize.y * customRow),
@@ -189,36 +202,15 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     createLabel(minLabelX, customRow + labelYOffset, "Custom Min:");
     createLabel(incLabelX, customRow + labelYOffset, "Inc (sec):");
 
-    pMinInput->setOnChange([this](std::string val) {
-        try
-        {
-            currentConfig.timeMinutes = std::stof(val);
-        }
-        catch (...)
-        {
-        }
-    });
-    pIncInput->setOnChange([this](std::string val) {
-        try
-        {
-            currentConfig.incrementSeconds = std::stof(val);
-        }
-        catch (...)
-        {
-        }
-    });
+    pMinInput->setOnChange([this](std::string val) { try { currentConfig.timeMinutes = std::stof(val); } catch (...) {} });
+    pIncInput->setOnChange([this](std::string val) { try { currentConfig.incrementSeconds = std::stof(val); } catch (...) {} });
 
-    // 4. PRESETS
     auto timeBtn = [&](std::string txt, float m, float inc, float x, float y) {
         bool selected = (std::abs(currentConfig.timeMinutes - m) < 0.01f && std::abs(currentConfig.incrementSeconds - inc) < 0.01f);
-
         setupButtons.push_back(createBtn({ x, y }, { 0.15f, 0.06f }, txt, [this, m, inc, pMinInput, pIncInput]() {
-                currentConfig.timeMinutes = m;
-                currentConfig.incrementSeconds = inc;
-                std::stringstream ssMin, ssInc;
-                ssMin << m; ssInc << inc;
-                pMinInput->setString(ssMin.str());
-                pIncInput->setString(ssInc.str());
+                currentConfig.timeMinutes = m; currentConfig.incrementSeconds = inc;
+                std::stringstream ssMin, ssInc; ssMin << m; ssInc << inc;
+                pMinInput->setString(ssMin.str()); pIncInput->setString(ssInc.str());
                 initButtons(); }, selected ? sf::Color::Green : sf::Color::White));
     };
 
@@ -238,53 +230,296 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     inputBoxes.push_back(std::move(minInput));
     inputBoxes.push_back(std::move(incInput));
 
-    // --- 5. IP INPUT (Если выбран Network) ---
-    // Поле ввода размещаем ниже, чтобы не накладываться на время
     float nextRow = customRow + 0.10f;
-
     if (currentConfig.opponentType == OpponentType::Network)
     {
-        float ipLabelX = 0.3f;
-        float ipInputX = 0.45f;
-        float ipInputW = 0.25f;
-
-        createLabel(ipLabelX, nextRow + labelYOffset, "Server IP:");
-
-        // limit 15 символов для IPv4
+        createLabel(0.3f, nextRow + labelYOffset, "Server IP:");
         auto ipInput = std::make_unique<InputBox>(
-            sf::Vector2f(winSize.x * ipInputX, winSize.y * nextRow),
-            sf::Vector2f(winSize.x * ipInputW, winSize.y * 0.06f),
+            sf::Vector2f(winSize.x * 0.45f, winSize.y * nextRow),
+            sf::Vector2f(winSize.x * 0.25f, winSize.y * 0.06f),
             *font, currentConfig.serverIp, true, 15);
-
-        ipInput->setOnChange([this](std::string val) {
-            currentConfig.serverIp = val;
-        });
-
+        ipInput->setOnChange([this](std::string val) { currentConfig.serverIp = val; });
         inputBoxes.push_back(std::move(ipInput));
-
-        // Кнопку старт сдвигаем ниже, только если появилось поле IP
         nextRow += 0.1f;
     }
     else
     {
-        // Если поля нет, кнопка будет чуть выше
         nextRow += 0.05f;
     }
 
-    // START BUTTON
-    // Позиция Y зависит от nextRow, чтобы не наехать на IP
     float startBtnY = (nextRow > 0.85f) ? 0.90f : 0.85f;
     if (startBtnY > 0.88f)
-        startBtnY = 0.88f; // Ограничиваем, чтобы не улетела совсем вниз
+        startBtnY = 0.88f;
 
     setupButtons.push_back(createBtn({ 0.35f, startBtnY }, { 0.3f, 0.1f }, "START GAME", [this]() {
         if (onStartGame) {
-            if (currentConfig.isRandomColor) {
-                currentConfig.playerColor = (rand() % 2 == 0) ? Color::White : Color::Black;
-            }
+            if (currentConfig.isRandomColor) currentConfig.playerColor = (rand() % 2 == 0) ? Color::White : Color::Black;
             if (currentConfig.timeMinutes <= 0) currentConfig.timeMinutes = 1;
             onStartGame(currentConfig);
         } }, sf::Color(100, 255, 100)));
+}
+
+void MainMenu::update()
+{
+    float dt = dtClock.restart().asSeconds();
+
+    if (currentScreen != MenuScreen::About)
+        return;
+
+    if (currentAnim == AnimType::None)
+    {
+        idleTimer += dt;
+        if (idleTimer >= 5.0f)
+        {
+            startRandomAnimation();
+            idleTimer = 0.0f;
+        }
+    }
+    else
+    {
+        switch (currentAnim)
+        {
+        case AnimType::KingChase:
+            updateKingChase(dt);
+            break;
+        case AnimType::PawnPromotion:
+            updatePawnPromotion(dt);
+            break;
+        case AnimType::KnightsLeap:
+            updateKnightsLeap(dt);
+            break;
+        case AnimType::BishopGlide:
+            updateBishopGlide(dt);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void MainMenu::startRandomAnimation()
+{
+    int r = rand() % 4;
+    float w = static_cast<float>(window.getSize().x);
+    float h = static_cast<float>(window.getSize().y);
+    float targetSize = h * 0.10f;
+
+    auto setupSprite = [&](sf::Sprite& s, const std::string& name) {
+        s.setTexture(*resourceManager.getTexture(name), true);
+        float texH = static_cast<float>(s.getTexture().getSize().y);
+        float scale = targetSize / texH;
+        s.setScale(sf::Vector2f(scale, scale));
+        s.setOrigin(sf::Vector2f(0.f, 0.f));
+        s.setRotation(sf::degrees(0));
+    };
+
+    animStateTime = 0.0f;
+    animPhase = 0.0f;
+    animFlag = false;
+    secondActorActive = false;
+    if (1)
+    {
+        currentAnim = AnimType::KingChase;
+        setupSprite(animSprite1, "king_black");
+        setupSprite(animSprite2, "rook_white");
+
+        sf::FloatRect b = animSprite1.getLocalBounds();
+        animSprite1.setOrigin(sf::Vector2f(b.size.x / 2.0f, b.size.y / 2.0f));
+
+        animSprite1.setPosition(sf::Vector2f(-targetSize * 1.5f, h * 0.7f + targetSize / 2));
+
+        animSprite2.setPosition(sf::Vector2f(-targetSize * 4.0f, h * 0.7f));
+    }
+    else if (r == 1)
+    {
+        currentAnim = AnimType::PawnPromotion;
+        setupSprite(animSprite1, "pawn_white");
+        animSprite1.setPosition(sf::Vector2f(w * 0.2f, h + targetSize));
+    }
+    else if (r == 2)
+    {
+        currentAnim = AnimType::KnightsLeap;
+        setupSprite(animSprite1, "knight_white");
+        setupSprite(animSprite2, "knight_black");
+
+        float jumpDist = targetSize * 1.5f;
+        float startX = -jumpDist * 3.0f;
+
+        animSprite1.setPosition(sf::Vector2f(startX, h * 0.8f));
+        animSprite2.setPosition(sf::Vector2f(startX + jumpDist, h * 0.8f));
+    }
+    else
+    {
+        currentAnim = AnimType::BishopGlide;
+        std::string tName = (rand() % 2 == 0) ? "bishop_white" : "bishop_black";
+        setupSprite(animSprite1, tName);
+        animSprite1.setPosition(sf::Vector2f(-targetSize, -targetSize));
+    }
+}
+
+void MainMenu::updateKingChase(float dt)
+{
+    animStateTime += dt;
+    float w = static_cast<float>(window.getSize().x);
+
+    sf::Vector2f kPos = animSprite1.getPosition();
+    float kWidth = animSprite1.getGlobalBounds().size.x;
+
+    if (!animFlag)
+    {
+        float cycle = fmod(animStateTime, 1.2f);
+        if (cycle < 0.2f)
+        {
+            kPos.x += 400.0f * dt;
+        }
+        animSprite1.setPosition(kPos);
+    }
+
+    if (!secondActorActive)
+    {
+        if (kPos.x > w / 2.0f)
+        {
+            secondActorActive = true;
+            sf::Vector2f rStartPos = animSprite2.getPosition();
+            if (rStartPos.x < -kWidth * 2.0f)
+            {
+                animSprite2.setPosition(sf::Vector2f(-kWidth * 2.0f, rStartPos.y));
+            }
+        }
+    }
+    else
+    {
+        sf::Vector2f rPos = animSprite2.getPosition();
+        rPos.x += 600.0f * dt;
+        animSprite2.setPosition(rPos);
+
+        if (!animFlag && rPos.x + kWidth * 0.5f > kPos.x)
+        {
+            animFlag = true;
+            animSprite1.setRotation(sf::degrees(90));
+        }
+    }
+
+    if (animSprite2.getPosition().x > w + kWidth)
+    {
+        currentAnim = AnimType::None;
+    }
+}
+
+void MainMenu::updatePawnPromotion(float dt)
+{
+    animStateTime += dt;
+    float h = static_cast<float>(window.getSize().y);
+    float w = static_cast<float>(window.getSize().x);
+    sf::Vector2f pos = animSprite1.getPosition();
+    float spriteH = animSprite1.getGlobalBounds().size.y;
+
+    if (!animFlag)
+    {
+        float cycle = fmod(animStateTime, 0.8f);
+        if (cycle < 0.4f)
+        {
+            pos.y -= 300.0f * dt;
+        }
+        animSprite1.setPosition(pos);
+
+        if (pos.y < h * 0.05f)
+        {
+            animFlag = true;
+            float targetSize = h * 0.10f;
+            animSprite1.setTexture(*resourceManager.getTexture("queen_white"), true);
+            float texH = static_cast<float>(animSprite1.getTexture().getSize().y);
+            float scale = targetSize / texH;
+            animSprite1.setScale(sf::Vector2f(scale, scale));
+        }
+    }
+    else
+    {
+        float speed = 400.0f;
+        pos.y += speed * dt;
+        pos.x += speed * dt;
+        animSprite1.setPosition(pos);
+
+        if (pos.y > h || pos.x > w)
+        {
+            currentAnim = AnimType::None;
+        }
+    }
+}
+
+void MainMenu::updateKnightsLeap(float dt)
+{
+    float w = static_cast<float>(window.getSize().x);
+    float h = static_cast<float>(window.getSize().y);
+    float spriteSize = animSprite1.getGlobalBounds().size.x;
+
+    float jumpDuration = 0.8f;
+    float jumpDist = spriteSize * 1.5f;
+    float groundY = h * 0.8f;
+    float jumpHeight = h * 0.15f;
+
+    animStateTime += dt;
+
+    int stepIndex = static_cast<int>(animStateTime / jumpDuration);
+    float t = fmod(animStateTime, jumpDuration) / jumpDuration;
+
+    float startX = -jumpDist * 3.0f;
+
+    sf::Vector2f p1, p2;
+
+    if (stepIndex % 2 == 0)
+    {
+        float k2_posIndex = (float)(stepIndex + 1);
+        p2.x = startX + k2_posIndex * jumpDist;
+        p2.y = groundY;
+
+        float k1_startIndex = (float)stepIndex;
+        float startX_k1 = startX + k1_startIndex * jumpDist;
+        float endX_k1 = startX_k1 + 2.0f * jumpDist;
+
+        p1.x = startX_k1 + (endX_k1 - startX_k1) * t;
+        p1.y = groundY - std::sin(t * 3.14159f) * jumpHeight;
+    }
+    else
+    {
+        float k1_posIndex = (float)(stepIndex + 1);
+        p1.x = startX + k1_posIndex * jumpDist;
+        p1.y = groundY;
+
+        float k2_startIndex = (float)stepIndex;
+        float startX_k2 = startX + k2_startIndex * jumpDist;
+        float endX_k2 = startX_k2 + 2.0f * jumpDist;
+
+        p2.x = startX_k2 + (endX_k2 - startX_k2) * t;
+        p2.y = groundY - std::sin(t * 3.14159f) * jumpHeight;
+    }
+
+    animSprite1.setPosition(p1);
+    animSprite2.setPosition(p2);
+
+    if (p1.x > w && p2.x > w)
+    {
+        currentAnim = AnimType::None;
+    }
+}
+
+void MainMenu::updateBishopGlide(float dt)
+{
+    float w = static_cast<float>(window.getSize().x);
+    float h = static_cast<float>(window.getSize().y);
+    float spriteW = animSprite1.getGlobalBounds().size.x;
+
+    sf::Vector2f pos = animSprite1.getPosition();
+    float speed = 300.0f;
+    pos.x += speed * dt;
+    pos.y += (speed * (h / w)) * dt;
+
+    animSprite1.setPosition(pos);
+
+    if (pos.x > w + spriteW)
+    {
+        currentAnim = AnimType::None;
+    }
 }
 
 void MainMenu::handleEvent(const std::optional<sf::Event>& event)
@@ -305,8 +540,6 @@ void MainMenu::handleEvent(const std::optional<sf::Event>& event)
     }
     else if (currentScreen == MenuScreen::About)
     {
-        for (auto& btn : aboutButtons)
-            btn->handleEvent(event, window);
         for (auto& btn : backButton)
             btn->handleEvent(event, window);
     }
@@ -336,15 +569,25 @@ void MainMenu::draw()
             box->draw(window);
         for (auto& label : labels)
             window.draw(label);
-
-        // Рисуем сообщение об ошибке (сверху, поверх всего)
         if (!errorText.getString().isEmpty())
             window.draw(errorText);
     }
     else if (currentScreen == MenuScreen::About)
     {
-        for (auto& btn : aboutButtons)
-            btn->draw(window);
+        if (currentAnim != AnimType::None)
+        {
+            if (currentAnim == AnimType::KnightsLeap || currentAnim == AnimType::KingChase)
+            {
+                window.draw(animSprite1);
+                window.draw(animSprite2);
+            }
+            else
+            {
+                window.draw(animSprite1);
+            }
+        }
+
+        window.draw(aboutText);
         for (auto& btn : backButton)
             btn->draw(window);
     }
