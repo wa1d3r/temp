@@ -1,4 +1,5 @@
 #pragma once
+#include <SFML/Network/Packet.hpp>
 
 class Position
 {
@@ -17,3 +18,9 @@ public:
     bool operator==(const Position& other) const;
     ~Position() = default;
 };
+
+// Оператор упаковки (запись)
+sf::Packet& operator<<(sf::Packet& packet, const Position& pos);
+
+// Оператор распаковки (чтение)
+sf::Packet& operator>>(sf::Packet& packet, Position& pos);
