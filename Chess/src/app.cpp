@@ -87,18 +87,26 @@ int main()
 
             if (netClient->connect(ip, 53000))
             {
-                std::cout << "Connected. Waiting for second player..." << std::endl;
+                std::cout << "Connected. Sending game config..." << std::endl;
+                netClient->sendGameConfig(config.playerColor, config.timeMinutes, config.incrementSeconds);
 
-                Color myColor = Color::White;
+                std::cout << "Waiting for second player..." << std::endl;
 
-                if (netClient->waitForStart(myColor))
+                Color finalColor = Color::White;
+                int finalTime = 10;
+                int finalInc = 0;
+
+                if (netClient->waitForStart(finalColor, finalTime, finalInc))
                 {
-                    config.playerColor = myColor;
+                    // Применяем настройки, полученные от сервера
+                    config.playerColor = finalColor;
+                    config.timeMinutes = finalTime;
+                    config.incrementSeconds = finalInc;
+
+                    std::cout << "Final Config: " << finalTime << " min + " << finalInc << " sec." << std::endl;
+
                     network = std::move(netClient);
-
                     graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
-
-                    graphics->setOnClickCallback([&](Position pos) {});
                 }
                 else
                 {
