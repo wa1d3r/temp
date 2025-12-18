@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <algorithm>
 
 class SFMLGraphics : public IGraphicsInterface
 {
@@ -157,7 +158,7 @@ public:
         float availableWidthForContent = winW * (1.0f - 2.0f * marginRatio);
         float widthFactor = 1.0f + clockGapRatio + clockWidthRatio;
         float maxSideByWidth = availableWidthForContent / widthFactor;
-        float boardSide = min(maxSideByHeight, maxSideByWidth);
+        float boardSide = std::min(maxSideByHeight, maxSideByWidth);
 
         float cellSizePx = boardSide / 8.0f;
         float clockWidth = boardSide * clockWidthRatio;
@@ -398,9 +399,24 @@ public:
         float whiteTime = board.getWhiteTime();
         float blackTime = board.getBlackTime();
 
+        float topTime, bottomTime;
+
+        if (viewColor == Color::White)
+        {
+            bottomTime = whiteTime;
+            topTime = blackTime;
+        }
+        else
+        {
+            bottomTime = blackTime;
+            topTime = whiteTime;
+        }
+
         bool isTopActive = currentPlayer != viewColor;
-        drawClock(blackTime, topClockArea, resourceManager.getTexture(isTopActive ? "active_clock" : "disactive_clock"));
-        drawClock(whiteTime, bottomClockArea, resourceManager.getTexture(isTopActive ? "disactive_clock" : "active_clock"));
+
+        drawClock(topTime, topClockArea, resourceManager.getTexture(isTopActive ? "active_clock" : "disactive_clock"));
+
+        drawClock(bottomTime, bottomClockArea, resourceManager.getTexture(isTopActive ? "disactive_clock" : "active_clock"));
 
         if (isPromotionActive)
         {
@@ -448,7 +464,7 @@ public:
         promotionButtons.clear();
 
         sf::Vector2u winSize = window.getSize();
-        float minSide = min(static_cast<float>(winSize.x), static_cast<float>(winSize.y));
+        float minSide = std::min(static_cast<float>(winSize.x), static_cast<float>(winSize.y));
         float margin = minSide * 0.05f;
         float boardSide = minSide - 2.0f * margin;
         float cellSize = (minSide * 0.9f) / 8.0f;
