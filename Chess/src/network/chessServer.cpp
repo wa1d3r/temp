@@ -1,8 +1,10 @@
-#include "chessServer.h" 
+#include "chessServer.h"
 
 ChessServer::ChessServer(unsigned short port)
     : port(port)
 {
+    clientsReady[0] = false;
+    clientsReady[1] = false;
 }
 
 void ChessServer::run()
@@ -29,11 +31,20 @@ void ChessServer::run()
     }
 }
 
+int ChessServer::getClientIndex(sf::TcpSocket& socket)
+{
+    for (size_t i = 0; i < clients.size(); ++i)
+    {
+        if (clients[i].get() == &socket)
+            return static_cast<int>(i);
+    }
+    return -1;
+}
+
 void ChessServer::handleNewConnection()
 {
     if (clients.size() >= 2)
     {
-        // Если уже 2 игрока, отклоняем 
         sf::TcpSocket temp;
         if (listener.accept(temp) == sf::Socket::Status::Done)
         {
@@ -54,26 +65,42 @@ void ChessServer::handleNewConnection()
         selector.add(*client);
         clients.push_back(std::move(client));
 
+        clientsReady[clients.size() - 1] = false;
+
+        std::cout << "Clients connected: " << clients.size() << "/2" << std::endl;
+
         if (clients.size() == 2)
         {
-            startGame();
-        }
-        else
-        {
-            std::cout << "Waiting for second player..." << std::endl;
+            std::cout << "Waiting for both players to send GameConfig..." << std::endl;
         }
     }
+}
+
+void ChessServer::abortGame()
+{
+    std::cout << "Game Modes mismatch! Aborting connection for both players." << std::endl;
+
+    sf::Packet packet;
+    packet << static_cast<int>(PacketType::Disconnect);
+
+    for (auto& client : clients)
+    {
+        client->send(packet);
+        selector.remove(*client);
+        client->disconnect();
+    }
+    clients.clear(); // Очистка вектора, которая ломала итератор
+    clientsReady[0] = false;
+    clientsReady[1] = false;
 }
 
 void ChessServer::startGame()
 {
     std::cout << "Match started! Applying host settings..." << std::endl;
     std::cout << "Settings: Host=" << (hostColorInt == 0 ? "White" : "Black")
-              << ", Time=" << timeMinutes << "+" << incrementSeconds << std::endl;
+              << ", Time=" << timeMinutes << "+" << incrementSeconds
+              << ", Mode=" << gameTypeInt << std::endl;
 
-    // 1. Формируем пакеты конфигурации
-
-    // Для Хоста (Client 0) - настройки как есть
     sf::Packet p1;
     p1 << static_cast<int>(PacketType::GameConfig)
        << hostColorInt
@@ -83,7 +110,6 @@ void ChessServer::startGame()
        << seed;
     clients[0]->send(p1);
 
-    // Для Гостя (Client 1)
     sf::Packet p2;
     int guestColorInt = (hostColorInt == 0) ? 1 : 0;
     p2 << static_cast<int>(PacketType::GameConfig)
@@ -114,13 +140,22 @@ void ChessServer::handleClientActivity()
 
             if (status == sf::Socket::Status::Done)
             {
-                processPacket(socket, packet);
+                // ИСПРАВЛЕНИЕ: Проверяем, вернул ли processPacket false
+                if (!processPacket(socket, packet))
+                {
+                    // Если false (abortGame сработал), вектор clients пуст.
+                    // Выходим из цикла, чтобы не делать ++it.
+                    break;
+                }
                 ++it;
             }
             else if (status == sf::Socket::Status::Disconnected)
             {
                 std::cout << "Client disconnected" << std::endl;
                 selector.remove(socket);
+                int idx = getClientIndex(socket);
+                if (idx != -1)
+                    clientsReady[idx] = false;
                 it = clients.erase(it);
             }
             else
@@ -135,7 +170,8 @@ void ChessServer::handleClientActivity()
     }
 }
 
-void ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
+// Теперь возвращает bool
+bool ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
 {
     int typeInt;
     if (packet >> typeInt)
@@ -160,21 +196,47 @@ void ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
         }
         else if (type == PacketType::GameConfig)
         {
-            if (clients.size() > 0 && clients[0].get() == &sender)
+            int c, t, i, g, s;
+            if (packet >> c >> t >> i >> g >> s)
             {
-                int c, t, i, g, s;
-                if (packet >> c >> t >> i >> g >> s)
+                int idx = getClientIndex(sender);
+                if (idx != -1)
                 {
-                    hostColorInt = c;
-                    timeMinutes = t;
-                    incrementSeconds = i;
-                    gameTypeInt = g;
-                    seed = s;
-                    std::cout << "Host updated settings: Mode=" << g << ", Seed=" << s << std::endl;
+                    clientGameTypes[idx] = g;
+                    clientsReady[idx] = true;
+                    std::cout << "Client " << idx << " config received. Mode: " << g << std::endl;
+
+                    if (idx == 0)
+                    {
+                        hostColorInt = c;
+                        timeMinutes = t;
+                        incrementSeconds = i;
+                        gameTypeInt = g;
+                        seed = s;
+                        std::cout << "Host settings updated." << std::endl;
+                    }
+                }
+
+                if (clients.size() == 2 && clientsReady[0] && clientsReady[1])
+                {
+                    if (clientGameTypes[0] == clientGameTypes[1])
+                    {
+                        startGame();
+                    }
+                    else
+                    {
+                        std::cerr << "Mode mismatch: Host(" << clientGameTypes[0]
+                                  << ") vs Guest(" << clientGameTypes[1] << ")" << std::endl;
+                        abortGame();
+                        // Возвращаем false, чтобы прервать цикл в handleClientActivity
+                        return false;
+                    }
                 }
             }
         }
     }
+    // По умолчанию продолжаем цикл
+    return true;
 }
 
 void ChessServer::relayPacketToOthers(sf::TcpSocket& sender, sf::Packet& packet)

@@ -19,6 +19,11 @@ class ChessServer
     int gameTypeInt = 0;
     int seed = 0;
 
+    // Храним выбранный режим игры для каждого клиента
+    int clientGameTypes[2] = { 0, 0 };
+    // Флаги, прислал ли клиент свой конфиг
+    bool clientsReady[2] = { false, false };
+
 public:
     ChessServer(unsigned short port);
     void run();
@@ -26,7 +31,12 @@ public:
 private:
     void handleNewConnection();
     void handleClientActivity();
-    void processPacket(sf::TcpSocket& sender, sf::Packet& packet);
+
+    // Изменили тип возврата на bool (true - всё ок, false - критическое изменение, выход из цикла)
+    bool processPacket(sf::TcpSocket& sender, sf::Packet& packet);
+
     void startGame();
+    void abortGame();
     void relayPacketToOthers(sf::TcpSocket& sender, sf::Packet& packet);
+    int getClientIndex(sf::TcpSocket& socket);
 };
