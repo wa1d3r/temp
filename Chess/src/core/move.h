@@ -14,7 +14,7 @@ class Move
 
 public:
     Move();
-    Move(Position from, Position to, bool is_castling = false,
+    Move(Position from, Position to, bool is_castling = false, 
         bool is_promotion = false, bool is_capture = false, const std::string& promotion_piece = "");
     Move(const Move&);
     Move(Move&&) noexcept;
@@ -32,8 +32,8 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Move& m);
 };
 
-// Оператор для записи хода в пакет 
+// Оператор для ЗАПИСИ хода в пакет (Сериализация)
 sf::Packet& operator<<(sf::Packet& packet, const Move& move);
 
-// Оператор для чтения хода из пакета 
+// Оператор для ЧТЕНИЯ хода из пакета (Десериализация)
 sf::Packet& operator>>(sf::Packet& packet, Move& move);

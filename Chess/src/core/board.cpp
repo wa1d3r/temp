@@ -42,6 +42,7 @@ Position Board::findPiece(const std::string& pieceType, Color color)
         if (it != row.end())
             return it->get()->getPosition();
     }
+    return Position();
 }
 
 bool Board::isValidMove(const Move& move) const

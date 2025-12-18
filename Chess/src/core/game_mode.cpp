@@ -267,7 +267,7 @@ void Fischer::initializeBoard(Piece::board_type& board)
     pf.registration<Bishop>("bishop");
     pf.registration<Queen>("queen");
     pf.registration<King>("king");
-    srand(static_cast<unsigned int>(time(0)));
+    srand(seed ? seed : static_cast<unsigned int>(time(0)));
     for (int i = 0; i < 8; i++)
     {
         board[1][i] = pf.create("pawn", Color::White, Position(i, 1));

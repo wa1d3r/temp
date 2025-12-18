@@ -68,11 +68,11 @@ std::ostream& operator<<(std::ostream& os, const Move& m)
 sf::Packet& operator<<(sf::Packet& packet, const Move& move)
 {
     return packet << move.getFrom()
-        << move.getTo()
-        << move.isCastling()
-        << move.isPromotion()
-        << move.isCapture()
-        << move.getPromotionPiece();
+                  << move.getTo()
+                  << move.isCastling()
+                  << move.isPromotion()
+                  << move.isCapture()
+                  << move.getPromotionPiece();
 }
 
 sf::Packet& operator>>(sf::Packet& packet, Move& move)
