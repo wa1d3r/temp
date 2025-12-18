@@ -8,6 +8,7 @@
 class ResourceManager
 {
     std::map<std::string, sf::Texture> textures;
+    std::map<std::string, sf::Font> fonts;
 
 public:
     ResourceManager() = default;
@@ -21,6 +22,7 @@ public:
             textures[name] = tex;
             return true;
         }
+        std::cerr << "Failed to load texture: " << path << " (" << name << ")" << std::endl;
         return false;
     }
 
@@ -42,6 +44,7 @@ public:
             fonts[name] = font;
             return true;
         }
+        std::cerr << "Failed to load font: " << path << std::endl;
         return false;
     }
 

@@ -82,6 +82,7 @@ void Button::handleEvent(const std::optional<sf::Event>& event, const sf::Render
             }
         }
     }
+
     if (is_hovered && event->is<sf::Event::MouseButtonPressed>())
     {
         if (event->getIf<sf::Event::MouseButtonPressed>()->button == sf::Mouse::Button::Left)
