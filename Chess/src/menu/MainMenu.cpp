@@ -1,5 +1,7 @@
 #include "MainMenu.h"
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 
 MainMenu::MainMenu(sf::RenderWindow& win, ResourceManager& rm)
     : window(win)
@@ -19,14 +21,27 @@ void MainMenu::resize()
     initButtons();
 }
 
+// Хелпер создания меток
+void MainMenu::createLabel(float x, float y, const std::string& str, unsigned int size)
+{
+    sf::Text text(*resourceManager.getFont("main_font"), str);
+    text.setCharacterSize(size);
+    text.setFillColor(sf::Color(200, 200, 200)); // Светло-серый
+
+    // Позиционируем по координатам экрана (проценты -> пиксели)
+    sf::FloatRect bounds = text.getLocalBounds();
+    text.setPosition(sf::Vector2f(window.getSize().x * x, window.getSize().y * y));
+
+    labels.push_back(text);
+}
+
 std::unique_ptr<Button> MainMenu::createBtn(sf::Vector2f pos, sf::Vector2f size,
     const std::string& text, std::function<void()> onClick, sf::Color color)
 {
     const sf::Font* font = resourceManager.getFont("main_font");
-
     return std::make_unique<Button>(
         pos, size, window.getSize(), 0.005f,
-        onClick, text, 30, font,
+        onClick, text, 24, font,
         color, sf::Color(200, 200, 255), sf::Color::Black, sf::Color::Black);
 }
 
@@ -37,12 +52,15 @@ void MainMenu::initButtons()
     setupButtons.clear();
     aboutButtons.clear();
     backButton.clear();
+    inputBoxes.clear();
+    labels.clear(); // Очищаем метки
 
     float btnW = 0.3f;
     float btnH = 0.08f;
     float startY = 0.3f;
     float gap = 0.12f;
 
+    // --- MAIN SCREEN ---
     mainButtons.push_back(createBtn({ 0.35f, startY }, { btnW, btnH }, "Classic Chess", [this]() {
         currentConfig.gameType = GameType::Classic;
         currentScreen = MenuScreen::GameSetup;
@@ -65,8 +83,10 @@ void MainMenu::initButtons()
     mainButtons.push_back(createBtn({ 0.35f, startY + gap * 4 }, { btnW, btnH }, "Exit", [this]() {
         if (onExit) onExit(); }, sf::Color(255, 150, 150)));
 
+    // --- SETUP SCREEN ---
     backButton.push_back(createBtn({ 0.05f, 0.9f }, { 0.15f, 0.06f }, "< Back", [this]() {
         currentScreen = MenuScreen::Main;
+        initButtons();
     }));
 
     if (currentScreen == MenuScreen::GameSetup)
@@ -83,13 +103,12 @@ void MainMenu::initButtons()
 void MainMenu::createSetupButtons(sf::Vector2u winSize)
 {
     float col1 = 0.1f, col2 = 0.4f, col3 = 0.7f;
-    float row = 0.2f;
+    float row = 0.15f;
 
+    // 1. OPPONENT
     setupButtons.push_back(createBtn({ col1, row }, { 0.25f, 0.08f }, "Local (2P)", [this]() {
         currentConfig.opponentType = OpponentType::Local;
-        initButtons();
-    },
-        currentConfig.opponentType == OpponentType::Local ? sf::Color::Green : sf::Color::White));
+        initButtons(); }, currentConfig.opponentType == OpponentType::Local ? sf::Color::Green : sf::Color::White));
 
     setupButtons.push_back(createBtn({ col2, row }, { 0.25f, 0.08f }, "Network", [this]() {
         currentConfig.opponentType = OpponentType::Network;
@@ -101,30 +120,120 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
 
     row += 0.15f;
 
+    // 2. COLOR
     setupButtons.push_back(createBtn({ col1, row }, { 0.25f, 0.08f }, "White", [this]() {
         currentConfig.playerColor = Color::White;
-        initButtons(); }, currentConfig.playerColor == Color::White ? sf::Color::Green : sf::Color::White));
+        currentConfig.isRandomColor = false;
+        initButtons(); }, (!currentConfig.isRandomColor && currentConfig.playerColor == Color::White) ? sf::Color::Green : sf::Color::White));
 
-    setupButtons.push_back(createBtn({ col2, row }, { 0.25f, 0.08f }, "Black", [this]() {
+    setupButtons.push_back(createBtn({ col2, row }, { 0.25f, 0.08f }, "Random", [this]() {
+        currentConfig.isRandomColor = true;
+        initButtons(); }, currentConfig.isRandomColor ? sf::Color::Green : sf::Color::White));
+
+    setupButtons.push_back(createBtn({ col3, row }, { 0.25f, 0.08f }, "Black", [this]() {
         currentConfig.playerColor = Color::Black;
-        initButtons(); }, currentConfig.playerColor == Color::Black ? sf::Color::Green : sf::Color::White));
+        currentConfig.isRandomColor = false;
+        initButtons(); }, (!currentConfig.isRandomColor && currentConfig.playerColor == Color::Black) ? sf::Color::Green : sf::Color::White));
 
     row += 0.15f;
 
-    auto timeBtn = [&](std::string txt, float m, float inc, float x) {
-        bool selected = (currentConfig.timeMinutes == m && currentConfig.incrementSeconds == inc);
-        setupButtons.push_back(createBtn({ x, row }, { 0.2f, 0.08f }, txt, [this, m, inc]() {
-            currentConfig.timeMinutes = m;
-            currentConfig.incrementSeconds = inc;
-            initButtons(); }, selected ? sf::Color::Green : sf::Color::White));
+    // 3. CUSTOM TIME INPUTS (Создаем до пресетов, чтобы пресеты могли их обновлять)
+    const sf::Font* font = resourceManager.getFont("main_font");
+    float customRow = row + 0.16f; // Сдвигаем ниже пресетов
+    float labelYOffset = 0.01f; // Подстройка по вертикали для текста
+
+    // Ширины элементов
+    float labelW = 0.15f;
+    float inputW = 0.10f;
+
+    // Координаты для Min
+    float minLabelX = 0.15f;
+    float minInputX = minLabelX + labelW; // Сразу после надписи
+
+    // Координаты для Inc
+    float incLabelX = 0.55f;
+    float incInputX = incLabelX + labelW;
+
+    // Создаем InputBox
+    auto minInput = std::make_unique<InputBox>(
+        sf::Vector2f(winSize.x * minInputX, winSize.y * customRow),
+        sf::Vector2f(winSize.x * inputW, winSize.y * 0.06f),
+        *font, std::to_string((int)currentConfig.timeMinutes));
+
+    auto incInput = std::make_unique<InputBox>(
+        sf::Vector2f(winSize.x * incInputX, winSize.y * customRow),
+        sf::Vector2f(winSize.x * inputW, winSize.y * 0.06f),
+        *font, std::to_string((int)currentConfig.incrementSeconds));
+
+    InputBox* pMinInput = minInput.get();
+    InputBox* pIncInput = incInput.get();
+
+    // Создаем надписи (Labels)
+    createLabel(minLabelX, customRow + labelYOffset, "Custom Min:");
+    createLabel(incLabelX, customRow + labelYOffset, "Inc (sec):");
+
+    // Обработчики ввода
+    pMinInput->setOnChange([this](std::string val) {
+        try
+        {
+            currentConfig.timeMinutes = std::stof(val);
+        }
+        catch (...)
+        {
+        }
+    });
+    pIncInput->setOnChange([this](std::string val) {
+        try
+        {
+            currentConfig.incrementSeconds = std::stof(val);
+        }
+        catch (...)
+        {
+        }
+    });
+
+    // 4. TIME PRESETS
+    auto timeBtn = [&](std::string txt, float m, float inc, float x, float y) {
+        bool selected = (std::abs(currentConfig.timeMinutes - m) < 0.01f && std::abs(currentConfig.incrementSeconds - inc) < 0.01f);
+
+        setupButtons.push_back(createBtn({ x, y }, { 0.15f, 0.06f }, txt, [this, m, inc, pMinInput, pIncInput]() {
+                currentConfig.timeMinutes = m;
+                currentConfig.incrementSeconds = inc;
+                std::stringstream ssMin, ssInc;
+                ssMin << m; ssInc << inc;
+                pMinInput->setString(ssMin.str());
+                pIncInput->setString(ssInc.str());
+                initButtons(); }, selected ? sf::Color::Green : sf::Color::White));
     };
 
-    timeBtn("1 + 0", 1, 0, col1);
-    timeBtn("3 + 2", 3, 2, col2);
-    timeBtn("10 + 5", 10, 5, col3);
+    // Ряд 1
+    timeBtn("1 + 0", 1, 0, 0.1f, row);
+    timeBtn("3 + 0", 3, 0, 0.27f, row);
+    timeBtn("3 + 2", 3, 2, 0.44f, row);
+    timeBtn("5 + 0", 5, 0, 0.61f, row);
+    timeBtn("5 + 3", 5, 3, 0.78f, row);
 
-    setupButtons.push_back(createBtn({ 0.35f, 0.8f }, { 0.3f, 0.1f }, "START GAME", [this]() {
-        if (onStartGame) onStartGame(currentConfig); }, sf::Color(100, 255, 100)));
+    row += 0.08f;
+    // Ряд 2
+    timeBtn("10 + 0", 10, 0, 0.1f, row);
+    timeBtn("10 + 5", 10, 5, 0.27f, row);
+    timeBtn("15 + 10", 15, 10, 0.44f, row);
+    timeBtn("30 + 0", 30, 0, 0.61f, row);
+    timeBtn("30 + 20", 30, 20, 0.78f, row);
+
+    // Добавляем инпуты в общий список
+    inputBoxes.push_back(std::move(minInput));
+    inputBoxes.push_back(std::move(incInput));
+
+    // START BUTTON
+    setupButtons.push_back(createBtn({ 0.35f, 0.85f }, { 0.3f, 0.1f }, "START GAME", [this]() {
+        if (onStartGame) {
+            if (currentConfig.isRandomColor) {
+                currentConfig.playerColor = (rand() % 2 == 0) ? Color::White : Color::Black;
+            }
+            if (currentConfig.timeMinutes <= 0) currentConfig.timeMinutes = 1;
+            onStartGame(currentConfig);
+        } }, sf::Color(100, 255, 100)));
 }
 
 void MainMenu::handleEvent(const std::optional<sf::Event>& event)
@@ -140,6 +249,8 @@ void MainMenu::handleEvent(const std::optional<sf::Event>& event)
             btn->handleEvent(event, window);
         for (auto& btn : backButton)
             btn->handleEvent(event, window);
+        for (auto& box : inputBoxes)
+            box->handleEvent(event, window);
     }
     else if (currentScreen == MenuScreen::About)
     {
@@ -170,6 +281,11 @@ void MainMenu::draw()
             btn->draw(window);
         for (auto& btn : backButton)
             btn->draw(window);
+        for (auto& box : inputBoxes)
+            box->draw(window);
+        // Рисуем метки
+        for (auto& label : labels)
+            window.draw(label);
     }
     else if (currentScreen == MenuScreen::About)
     {
