@@ -13,10 +13,11 @@ class ChessServer
     std::vector<std::unique_ptr<sf::TcpSocket>> clients;
     unsigned short port;
 
-    // Хранилище настроек матча
     int hostColorInt = 0; // 0 - White, 1 - Black
     int timeMinutes = 10;
     int incrementSeconds = 0;
+    int gameTypeInt = 0;
+    int seed = 0;
 
 public:
     ChessServer(unsigned short port);

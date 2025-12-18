@@ -34,7 +34,7 @@ bool NetworkClient::connect(const std::string& ip, unsigned short port)
     return false;
 }
 
-void NetworkClient::sendGameConfig(Color color, int timeMinutes, int incrementSeconds)
+void NetworkClient::sendGameConfig(Color color, int timeMinutes, int incrementSeconds, int gameType, int seed)
 {
     if (!connected)
         return;
@@ -45,12 +45,14 @@ void NetworkClient::sendGameConfig(Color color, int timeMinutes, int incrementSe
     packet << static_cast<int>(PacketType::GameConfig)
            << colorInt
            << timeMinutes
-           << incrementSeconds;
+           << incrementSeconds
+           << gameType
+           << seed;
 
     socket.send(packet);
 }
 
-bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& incrementSeconds)
+bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& incrementSeconds, int& gameType, int& seed)
 {
     if (!connected)
         return false;
@@ -81,12 +83,13 @@ bool NetworkClient::waitForStart(Color& assignedColor, int& timeMinutes, int& in
                 if (type == PacketType::GameConfig)
                 {
                     int colorInt;
-                    if (packet >> colorInt >> timeMinutes >> incrementSeconds)
+                    if (packet >> colorInt >> timeMinutes >> incrementSeconds >> gameType >> seed)
                     {
                         assignedColor = (colorInt == 0) ? Color::White : Color::Black;
                         std::cout << "Config received: "
                                   << (colorInt == 0 ? "White" : "Black")
                                   << ", " << timeMinutes << "m+" << incrementSeconds << "s"
+                                  << ", Mode: " << gameType << ", Seed: " << seed
                                   << std::endl;
                     }
                 }

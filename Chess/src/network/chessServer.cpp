@@ -78,19 +78,22 @@ void ChessServer::startGame()
     p1 << static_cast<int>(PacketType::GameConfig)
        << hostColorInt
        << timeMinutes
-       << incrementSeconds;
+       << incrementSeconds
+       << gameTypeInt
+       << seed;
     clients[0]->send(p1);
 
-    // Для Гостя (Client 1) - цвет инвертирован
+    // Для Гостя (Client 1)
     sf::Packet p2;
-    int guestColorInt = (hostColorInt == 0) ? 1 : 0; // Инверсия
+    int guestColorInt = (hostColorInt == 0) ? 1 : 0;
     p2 << static_cast<int>(PacketType::GameConfig)
        << guestColorInt
        << timeMinutes
-       << incrementSeconds;
+       << incrementSeconds
+       << gameTypeInt
+       << seed;
     clients[1]->send(p2);
 
-    // 2. Отправляем сигнал старта
     sf::Packet pStart;
     pStart << static_cast<int>(PacketType::StartGame);
 
@@ -159,13 +162,15 @@ void ChessServer::processPacket(sf::TcpSocket& sender, sf::Packet& packet)
         {
             if (clients.size() > 0 && clients[0].get() == &sender)
             {
-                int c, t, i;
-                if (packet >> c >> t >> i)
+                int c, t, i, g, s;
+                if (packet >> c >> t >> i >> g >> s)
                 {
                     hostColorInt = c;
                     timeMinutes = t;
                     incrementSeconds = i;
-                    std::cout << "Host updated settings: " << t << "m+" << i << "s" << std::endl;
+                    gameTypeInt = g;
+                    seed = s;
+                    std::cout << "Host updated settings: Mode=" << g << ", Seed=" << s << std::endl;
                 }
             }
         }
