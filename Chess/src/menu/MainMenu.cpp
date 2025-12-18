@@ -21,14 +21,14 @@ void MainMenu::resize()
     initButtons();
 }
 
-// РҐРµР»РїРµСЂ СЃРѕР·РґР°РЅРёСЏ РјРµС‚РѕРє
+// Хелпер создания меток
 void MainMenu::createLabel(float x, float y, const std::string& str, unsigned int size)
 {
     sf::Text text(*resourceManager.getFont("main_font"), str);
     text.setCharacterSize(size);
-    text.setFillColor(sf::Color(200, 200, 200)); // РЎРІРµС‚Р»Рѕ-СЃРµСЂС‹Р№
+    text.setFillColor(sf::Color(200, 200, 200)); // Светло-серый
 
-    // РџРѕР·РёС†РёРѕРЅРёСЂСѓРµРј РїРѕ РєРѕРѕСЂРґРёРЅР°С‚Р°Рј СЌРєСЂР°РЅР° (РїСЂРѕС†РµРЅС‚С‹ -> РїРёРєСЃРµР»Рё)
+    // Позиционируем по координатам экрана (проценты -> пиксели)
     sf::FloatRect bounds = text.getLocalBounds();
     text.setPosition(sf::Vector2f(window.getSize().x * x, window.getSize().y * y));
 
@@ -53,7 +53,7 @@ void MainMenu::initButtons()
     aboutButtons.clear();
     backButton.clear();
     inputBoxes.clear();
-    labels.clear(); // РћС‡РёС‰Р°РµРј РјРµС‚РєРё
+    labels.clear(); // Очищаем метки
 
     float btnW = 0.3f;
     float btnH = 0.08f;
@@ -137,24 +137,24 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
 
     row += 0.15f;
 
-    // 3. CUSTOM TIME INPUTS (РЎРѕР·РґР°РµРј РґРѕ РїСЂРµСЃРµС‚РѕРІ, С‡С‚РѕР±С‹ РїСЂРµСЃРµС‚С‹ РјРѕРіР»Рё РёС… РѕР±РЅРѕРІР»СЏС‚СЊ)
+    // 3. CUSTOM TIME INPUTS (Создаем до пресетов, чтобы пресеты могли их обновлять)
     const sf::Font* font = resourceManager.getFont("main_font");
-    float customRow = row + 0.16f; // РЎРґРІРёРіР°РµРј РЅРёР¶Рµ РїСЂРµСЃРµС‚РѕРІ
-    float labelYOffset = 0.01f; // РџРѕРґСЃС‚СЂРѕР№РєР° РїРѕ РІРµСЂС‚РёРєР°Р»Рё РґР»СЏ С‚РµРєСЃС‚Р°
+    float customRow = row + 0.16f; // Сдвигаем ниже пресетов
+    float labelYOffset = 0.01f; // Подстройка по вертикали для текста
 
-    // РЁРёСЂРёРЅС‹ СЌР»РµРјРµРЅС‚РѕРІ
+    // Ширины элементов
     float labelW = 0.15f;
     float inputW = 0.10f;
 
-    // РљРѕРѕСЂРґРёРЅР°С‚С‹ РґР»СЏ Min
+    // Координаты для Min
     float minLabelX = 0.15f;
-    float minInputX = minLabelX + labelW; // РЎСЂР°Р·Сѓ РїРѕСЃР»Рµ РЅР°РґРїРёСЃРё
+    float minInputX = minLabelX + labelW; // Сразу после надписи
 
-    // РљРѕРѕСЂРґРёРЅР°С‚С‹ РґР»СЏ Inc
+    // Координаты для Inc
     float incLabelX = 0.55f;
     float incInputX = incLabelX + labelW;
 
-    // РЎРѕР·РґР°РµРј InputBox
+    // Создаем InputBox
     auto minInput = std::make_unique<InputBox>(
         sf::Vector2f(winSize.x * minInputX, winSize.y * customRow),
         sf::Vector2f(winSize.x * inputW, winSize.y * 0.06f),
@@ -168,11 +168,11 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     InputBox* pMinInput = minInput.get();
     InputBox* pIncInput = incInput.get();
 
-    // РЎРѕР·РґР°РµРј РЅР°РґРїРёСЃРё (Labels)
+    // Создаем надписи (Labels)
     createLabel(minLabelX, customRow + labelYOffset, "Custom Min:");
     createLabel(incLabelX, customRow + labelYOffset, "Inc (sec):");
 
-    // РћР±СЂР°Р±РѕС‚С‡РёРєРё РІРІРѕРґР°
+    // Обработчики ввода
     pMinInput->setOnChange([this](std::string val) {
         try
         {
@@ -206,7 +206,7 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
                 initButtons(); }, selected ? sf::Color::Green : sf::Color::White));
     };
 
-    // Р СЏРґ 1
+    // Ряд 1
     timeBtn("1 + 0", 1, 0, 0.1f, row);
     timeBtn("3 + 0", 3, 0, 0.27f, row);
     timeBtn("3 + 2", 3, 2, 0.44f, row);
@@ -214,14 +214,14 @@ void MainMenu::createSetupButtons(sf::Vector2u winSize)
     timeBtn("5 + 3", 5, 3, 0.78f, row);
 
     row += 0.08f;
-    // Р СЏРґ 2
+    // Ряд 2
     timeBtn("10 + 0", 10, 0, 0.1f, row);
     timeBtn("10 + 5", 10, 5, 0.27f, row);
     timeBtn("15 + 10", 15, 10, 0.44f, row);
     timeBtn("30 + 0", 30, 0, 0.61f, row);
     timeBtn("30 + 20", 30, 20, 0.78f, row);
 
-    // Р”РѕР±Р°РІР»СЏРµРј РёРЅРїСѓС‚С‹ РІ РѕР±С‰РёР№ СЃРїРёСЃРѕРє
+    // Добавляем инпуты в общий список
     inputBoxes.push_back(std::move(minInput));
     inputBoxes.push_back(std::move(incInput));
 
@@ -283,7 +283,7 @@ void MainMenu::draw()
             btn->draw(window);
         for (auto& box : inputBoxes)
             box->draw(window);
-        // Р РёСЃСѓРµРј РјРµС‚РєРё
+        // Рисуем метки
         for (auto& label : labels)
             window.draw(label);
     }

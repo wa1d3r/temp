@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-// ... (РћСЃС‚Р°Р»СЊРЅС‹Рµ enum Рё struct Р±РµР· РёР·РјРµРЅРµРЅРёР№) ...
+// ... (Остальные enum и struct без изменений) ...
 enum class AppState
 {
     Menu,
@@ -36,6 +36,7 @@ struct GameConfig
     bool isRandomColor = false;
     float timeMinutes = 10.0f;
     float incrementSeconds = 5.0f;
+    int seed = 0;
 };
 
 enum class MenuScreen
@@ -60,7 +61,7 @@ class MainMenu
     std::vector<std::unique_ptr<Button>> backButton;
 
     std::vector<std::unique_ptr<InputBox>> inputBoxes;
-    std::vector<sf::Text> labels; // <--- РќРћР’РћР•: РҐСЂР°РЅРёР»РёС‰Рµ РґР»СЏ РїСЂРѕСЃС‚С‹С… РЅР°РґРїРёСЃРµР№
+    std::vector<sf::Text> labels; // <--- НОВОЕ: Хранилище для простых надписей
 
     std::unique_ptr<sf::Sprite> backgroundSprite;
 
@@ -81,7 +82,7 @@ private:
     void initButtons();
     void createSetupButtons(sf::Vector2u winSize);
 
-    // РҐРµР»РїРµСЂ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РЅР°РґРїРёСЃРµР№
+    // Хелпер для создания надписей
     void createLabel(float x, float y, const std::string& text, unsigned int size = 24);
 
     std::unique_ptr<Button> createBtn(
