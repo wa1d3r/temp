@@ -1,6 +1,7 @@
 #include "game_mode.h"
 
-std::unique_ptr<Piece> Test::clonePiece(const Piece& piece) const
+std::unique_ptr<Piece>
+Test::clonePiece(const Piece& piece) const
 {
     PieceFactory pf;
     pf.registration<Pawn>("pawn");
@@ -57,7 +58,8 @@ void Test::move(Piece::board_type& board, Move move, std::optional<Color> curren
     Position to = move.getTo();
 
     board[to.getY()][to.getX()] = std::move(board[from.getY()][from.getX()]);
-    board[to.getY()][to.getX()]->move(move);
+    if (board[to.getY()][to.getX()])
+        board[to.getY()][to.getX()]->move(move);
 
     if (move.isCapture())
     {
@@ -86,10 +88,6 @@ void Test::move(Piece::board_type& board, Move move, std::optional<Color> curren
             pf.registration<Knight>("knight");
             board[to.getY()][to.getX()] = pf.create(move.getPromotionPiece(), *currentPlayer, to);
         }
-    }
-    else
-    {
-        board[from.getY()][from.getX()] = nullptr;
     }
 }
 
@@ -132,20 +130,18 @@ bool Test::isValidMove(const Piece::board_type& board, Color color, Move move, s
 
 bool Test::isCheckmate(const Piece::board_type& board, Color color, std::optional<Move> lastMove)
 {
-    // 1. ћат возможен, только если король сейчас под шахом
     if (!isInCheck(board, color, lastMove))
     {
         return false;
     }
 
-    // 2. ѕровер€ем все возможные ходы
     std::vector<Move> all_possible_moves = getAllMoves(board, color, lastMove);
 
     for (const Move& move : all_possible_moves)
     {
         if (isValidMove(board, color, move, lastMove))
         {
-            return false; // Ќашли хот€ бы один доступный ход Ч значит, не мат
+            return false;
         }
     }
 
@@ -176,7 +172,7 @@ bool Test::ceilInCheck(const Piece::board_type& board, std::vector<Move> enemy_m
 {
     return enemy_moves.end() != std::find_if(enemy_moves.begin(), enemy_moves.end(), [pos](const Move& move) {
         return move.getTo() == pos;
-        });
+    });
 }
 
 bool Test::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
@@ -242,6 +238,7 @@ const std::vector<std::string>& Test::getPromotionTypes() const
     return promotionTypes;
 }
 
+
 std::unique_ptr<Piece> Fischer::clonePiece(const Piece& piece) const
 {
     PieceFactory pf;
@@ -270,7 +267,7 @@ void Fischer::initializeBoard(Piece::board_type& board)
     pf.registration<Bishop>("bishop");
     pf.registration<Queen>("queen");
     pf.registration<King>("king");
-    srand(time(0));
+    srand(static_cast<unsigned int>(time(0)));
     for (int i = 0; i < 8; i++)
     {
         board[1][i] = pf.create("pawn", Color::White, Position(i, 1));
@@ -283,7 +280,7 @@ void Fischer::initializeBoard(Piece::board_type& board)
     positions.erase(
         std::remove_if(positions.begin(), positions.end(), [kingPosition, firstRookPosition, secondRookPosition](int x) {
             return x == kingPosition || x == firstRookPosition || x == secondRookPosition;
-            }),
+        }),
         positions.end());
     int firstBishopPosition = positions[rand() % 5];
     int secondBishopPosition = positions[rand() % 5];
@@ -292,7 +289,7 @@ void Fischer::initializeBoard(Piece::board_type& board)
     positions.erase(
         std::remove_if(positions.begin(), positions.end(), [firstBishopPosition, secondBishopPosition](int x) {
             return x == firstBishopPosition || x == secondBishopPosition;
-            }),
+        }),
         positions.end());
     std::random_device rd;
     std::mt19937 g(rd());
@@ -324,40 +321,64 @@ void Fischer::move(Piece::board_type& board, Move move, std::optional<Color> cur
     Position from = move.getFrom();
     Position to = move.getTo();
 
-    board[to.getY()][to.getX()] = std::move(board[from.getY()][from.getX()]);
-    board[to.getY()][to.getX()]->move(move);
+    if (move.isCastling())
+    {
+        int scanDir = (to.getX() == 6) ? 1 : -1;
+        int y = from.getY();
 
-    if (move.isCapture())
-    {
-        board[from.getY()][to.getX()] = nullptr;
-    }
-    else if (move.isCastling())
-    {
-        for (int dx = to.getX() > from.getX() ? 1 : -1; from.isValid(); from = Position(from.getX() + dx, from.getY()))
+        Position rookPos(-1, -1);
+
+        for (int x = from.getX() + scanDir; x >= 0 && x < 8; x += scanDir)
         {
-            if (board[from.getY()][from.getX()] && board[from.getY()][from.getX()]->getType() == "rook")
+            if (board[y][x])
             {
-                board[to.getY()][to.getX() - dx] = std::move(board[from.getY()][from.getX()]);
-                board[to.getY()][to.getX() - dx]->move(Move(Position(from.getX(), from.getY()), Position(to.getX() - dx, to.getY())));
+                if (board[y][x]->getType() == "rook")
+                {
+                    rookPos = Position(x, y);
+                }
                 break;
             }
         }
-    }
-    else if (move.isPromotion())
-    {
-        if (!move.getPromotionPiece().empty() && currentPlayer.has_value())
+
+        if (rookPos.isValid())
         {
-            PieceFactory pf;
-            pf.registration<Queen>("queen");
-            pf.registration<Rook>("rook");
-            pf.registration<Bishop>("bishop");
-            pf.registration<Knight>("knight");
-            board[to.getY()][to.getX()] = pf.create(move.getPromotionPiece(), *currentPlayer, to);
+            int rookTargetX = (to.getX() == 6) ? 5 : 3;
+            Position rookTo(rookTargetX, y);
+
+            auto kingPiece = std::move(board[from.getY()][from.getX()]);
+            auto rookPiece = std::move(board[rookPos.getY()][rookPos.getX()]);
+
+            if (kingPiece)
+                kingPiece->move(move);
+            if (rookPiece)
+                rookPiece->move(Move(rookPos, rookTo));
+
+            board[to.getY()][to.getX()] = std::move(kingPiece);
+            board[rookTo.getY()][rookTo.getX()] = std::move(rookPiece);
         }
     }
     else
     {
-        board[from.getY()][from.getX()] = nullptr;
+        board[to.getY()][to.getX()] = std::move(board[from.getY()][from.getX()]);
+        if (board[to.getY()][to.getX()])
+            board[to.getY()][to.getX()]->move(move);
+
+        if (move.isCapture())
+        {
+            board[from.getY()][to.getX()] = nullptr;
+        }
+        else if (move.isPromotion())
+        {
+            if (!move.getPromotionPiece().empty() && currentPlayer.has_value())
+            {
+                PieceFactory pf;
+                pf.registration<Queen>("queen");
+                pf.registration<Rook>("rook");
+                pf.registration<Bishop>("bishop");
+                pf.registration<Knight>("knight");
+                board[to.getY()][to.getX()] = pf.create(move.getPromotionPiece(), *currentPlayer, to);
+            }
+        }
     }
 }
 
@@ -368,26 +389,77 @@ bool Fischer::isValidMove(const Piece::board_type& board, Color color, Move move
         if (isInCheck(board, color, lastMove))
             return false;
 
-        Position kingPos = move.getFrom();
+        Position kingFrom = move.getFrom();
         Position kingTo = move.getTo();
+        int y = kingFrom.getY();
 
-        if (board[kingPos.getY()][kingPos.getX()]->isMoved())
+        if (board[kingFrom.getY()][kingFrom.getX()]->isMoved())
             return false;
 
-        std::vector<Move> enemyMoves = getAllMoves(board, color == Color::White ? Color::Black : Color::White, lastMove);
-        int dx = kingTo.getX() > kingPos.getX() ? 1 : -1;
-        kingPos = Position(kingPos.getX() + dx, kingPos.getY());
-        for (; !(kingPos == kingTo); kingPos = Position(kingPos.getX() + dx, kingPos.getY()))
-        {
-            if (board[kingPos.getY()][kingPos.getX()]
-                && (board[kingPos.getY()][kingPos.getX()]->getColor() != color
-                    || board[kingPos.getY()][kingPos.getX()]->getType() != "rook"
-                    || board[kingPos.getY()][kingPos.getX()]->isMoved()))
-                return false;
+        int scanDir = (kingTo.getX() == 6) ? 1 : -1;
+        Position rookPos(-1, -1);
+        bool foundRook = false;
 
-            if (ceilInCheck(board, enemyMoves, kingPos))
+        for (int x = kingFrom.getX() + scanDir; x >= 0 && x < 8; x += scanDir)
+        {
+            if (board[y][x])
+            {
+                if (board[y][x]->getType() == "rook" && board[y][x]->getColor() == color && !board[y][x]->isMoved())
+                {
+                    rookPos = Position(x, y);
+                    foundRook = true;
+                }
+                break;
+            }
+        }
+
+        if (!foundRook)
+            return false;
+
+        int kStart = std::min(kingFrom.getX(), kingTo.getX());
+        int kEnd = std::max(kingFrom.getX(), kingTo.getX());
+        for (int x = kStart; x <= kEnd; ++x)
+        {
+            if (x == kingFrom.getX())
+                continue;
+            if (x == rookPos.getX())
+                continue;
+            if (board[y][x])
                 return false;
         }
+
+        int rookTargetX = (kingTo.getX() == 6) ? 5 : 3;
+        int rStart = std::min(rookPos.getX(), rookTargetX);
+        int rEnd = std::max(rookPos.getX(), rookTargetX);
+        for (int x = rStart; x <= rEnd; ++x)
+        {
+            if (x == rookPos.getX())
+                continue;
+            if (x == kingFrom.getX())
+                continue;
+            if (board[y][x])
+                return false;
+        }
+
+        std::vector<Move> enemyMoves = getAllMoves(board, color == Color::White ? Color::Black : Color::White, lastMove);
+
+        int checkStart = std::min(kingFrom.getX(), kingTo.getX());
+        int checkEnd = std::max(kingFrom.getX(), kingTo.getX());
+
+        for (int x = checkStart; x <= checkEnd; ++x)
+        {
+            if (x == kingFrom.getX())
+                continue;
+            if (ceilInCheck(board, enemyMoves, Position(x, y)))
+                return false;
+        }
+
+        auto tempGrid = copyBoard(board);
+        this->move(tempGrid, move);
+        if (isInCheck(tempGrid, color, move))
+            return false;
+
+        return true;
     }
 
     auto tempGrid = copyBoard(board);
@@ -440,7 +512,7 @@ bool Fischer::ceilInCheck(const Piece::board_type& board, std::vector<Move> enem
 {
     return enemy_moves.end() != std::find_if(enemy_moves.begin(), enemy_moves.end(), [pos](const Move& move) {
         return move.getTo() == pos;
-        });
+    });
 }
 
 bool Fischer::isInCheck(const Piece::board_type& board, Color color, std::optional<Move> lastMove) const
