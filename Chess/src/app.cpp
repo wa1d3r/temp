@@ -1,5 +1,6 @@
-#include "core/Stockfish.h" // Подключаем Stockfish
+#include "core/Stockfish.h"
 #include "core/board.h"
+#include "network/NetworkClient.h"
 #include "game_controller.h"
 #include "graphic/ResourceManager.h"
 #include "graphic/sfml_graphics.h"
@@ -50,8 +51,10 @@ int main()
 
     mainMenu.setOnStartGame([&](GameConfig config) {
         std::unique_ptr<GameMode> gameMode;
-        // Здесь можно было бы выбирать разные режимы (Classic/Fischer)
-        gameMode = std::make_unique<Test>();
+        if (config.gameType == GameType::Classic)
+            gameMode = std::make_unique<Test>();
+        else
+            gameMode = std::make_unique<Fischer>();
 
         auto board = std::make_unique<Board>(std::move(gameMode), config.timeMinutes * 60, config.incrementSeconds);
 
@@ -64,7 +67,6 @@ int main()
         {
             auto netClient = std::make_unique<NetworkClient>();
 
-            // 1. Ввод IP
             std::string ip;
             std::cout << "Enter Server IP (default 127.0.0.1): ";
 
@@ -83,7 +85,6 @@ int main()
 
             std::cout << "Connecting to [" << ip << "]..." << std::endl;
 
-            // 2. Подключение
             if (netClient->connect(ip, 53000))
             {
                 std::cout << "Connected. Waiting for second player..." << std::endl;
@@ -94,25 +95,25 @@ int main()
                 {
                     config.playerColor = myColor;
                     network = std::move(netClient);
+
                     graphics = std::make_shared<SFMLGraphics>(window, resourceManager, config.playerColor);
-                    graphics->setOnClickCallback([&](Position pos) {
-                        });
+
+                    graphics->setOnClickCallback([&](Position pos) {});
                 }
                 else
                 {
                     std::cout << "Connection failed or server disconnected." << std::endl;
-                    return; 
+                    return;
                 }
             }
             else
             {
                 std::cout << "Failed to connect." << std::endl;
-                return; 
+                return;
             }
         }
         else if (config.opponentType == OpponentType::AI)
         {
-            // Убедитесь, что stockfish.exe лежит рядом с программой
             stockfish = std::make_unique<Stockfish>("stockfish.exe");
         }
 
@@ -167,13 +168,14 @@ int main()
             {
                 graphics->handleEvent(event);
             }
-            else if (appState == AppState::EndGame)
-            {
-                appState = AppState::Menu;
-                gameController.reset();
-                graphics.reset();
-                mainMenu.resize();
-            }
+        }
+
+        if (appState == AppState::EndGame)
+        {
+            appState = AppState::Menu;
+            gameController.reset();
+            graphics.reset();
+            mainMenu.resize();
         }
 
         window.clear();
